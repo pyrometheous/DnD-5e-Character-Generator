@@ -35,15 +35,16 @@ DICE = {
 }
 
 
-def attack(die, modifier=None):
+def attack(dice_to_roll, modifier=None):
+    num_rolls, die = dice_to_roll.split('d')
+    die = f"d{die}"
     if die in DICE:
-        roll = DICE[die]()
+        roll = dice(dice_to_roll)
     else:
-        return "Invalid Die"
-
+        raise Exception(f"Invalid dice_to_roll={dice_to_roll}. Good Example: 1d6 or 3d8")
     if modifier:
         roll = roll + modifier
-
+    # print(f"Roll: {roll}")
     return roll
 
 
@@ -52,7 +53,8 @@ def to_hit(armor_class, modifier=None):
         roll = d20() + modifier
     else:
         roll = d20()
-    if roll <= armor_class:
+    # print(f"Roll: {roll}")
+    if roll >= armor_class:
         return True
     else:
         return False

@@ -105,6 +105,7 @@ class Character:
         Class: {self.char_class}
         Level: {self.level}
         HP: {self.hp}
+        Strength: {self.strength} Mod: {modifier(self.strength)}
         Dexterity: {self.dexterity} Mod: {modifier(self.dexterity)}
         Constitution: {self.constitution} Mod: {modifier(self.constitution)}
         Intelligence: {self.intelligence} Mod: {modifier(self.intelligence)}
