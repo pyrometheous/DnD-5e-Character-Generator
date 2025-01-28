@@ -132,7 +132,7 @@ def random_character_class():
     return random.choice(list(CHARACTER_CLASSES.keys()))
 
 
-def random_race():
+def random_species():
     return random.choice(list(SPECIES.keys()))
 
 
@@ -164,7 +164,7 @@ def stat_generator():
 
 def create_random_character():
     char_class = random_character_class()
-    species = random_race()
+    species = random_species()
     fictional_names_race = SPECIES[species]["fictional_names_race"]
     sex = random.choice(['male', 'female']).capitalize()
     name = names(gender=sex, style=fictional_names_race)
