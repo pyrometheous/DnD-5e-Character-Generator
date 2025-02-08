@@ -1,7 +1,20 @@
 import roll
+from tinys_srd import Classes, Equipment, Proficiencies
+from tinys_srd import Races as Species
 import random
 from fictional_names import name_generator
 names = name_generator.generate_name
+
+
+# print(Classes.entries)
+# print(Equipment.entries)
+#
+# print(Proficiencies.entries)
+print(Classes.bard)
+print(Classes.bard.hit_die)
+#
+# print(Equipment.trident)
+
 
 
 CHARACTER_CLASSES = {
@@ -33,27 +46,45 @@ PROFICIENCIES = {
 }
 
 
+# HALF_SPECIES = {
+#     el
+# }
+
+
+
 SPECIES = {
     "Human": {
-        "fictional_names_race": "human"
+        "fictional_names_species": "human"
     },
     "Elf": {
-        "fictional_names_race": "elven"
+        "fictional_names_species": "elven"
     },
     "Halfling": {
-        "fictional_names_race": "halfling"
+        "fictional_names_species": "halfling"
     },
     "Orc": {
-        "fictional_names_race": "orc"
+        "fictional_names_species": "orc"
     },
     "Drow": {
-        "fictional_names_race": "drow"
+        "fictional_names_species": "drow"
     },
     "Dwarf": {
-        "fictional_names_race": "dwarven"
+        "fictional_names_species": "dwarven"
     },
     "Gnome": {
-        "fictional_names_race": "gnomish"
+        "fictional_names_species": "gnomish"
+    },
+    "Half_elf": {
+        "fictional_names_species": random.choice(["human", "elven"])
+    },
+    "Dragonborn": {
+        "fictional_names_species": 'dragonborn'
+    },
+    "Tiefling": {
+        "fictional_names_species": 'dragonborn'
+    },
+    "Half_orc": {
+        "fictional_names_species": random.choice(["human", "orc"])
     }
 }
 
@@ -95,6 +126,10 @@ class Character:
     def add_equipment(self, equipment):
         self.equipment.append(equipment)
 
+    def get_equipment_name(self, equipment):
+        equipment_index = getattr(Equipment, equipment)
+        return equipment_index.name
+
     def display_character_sheet(self):
         character_sheet = f"""
         Character Sheet:
@@ -112,7 +147,7 @@ class Character:
         Wisdom: {self.wisdom} Mod: {modifier(self.wisdom)}
         Charisma: {self.charisma} Mod: {modifier(self.charisma)}
         Proficiencies: {self.proficiencies}
-        Equipment: {self.equipment}
+        Equipment: {self.get_equipment_name(self.equipment[0])}
         """
         print(character_sheet)
 
@@ -122,30 +157,32 @@ def modifier(ability_score):
 
 
 def random_proficiency():
-    return random.choice(list(PROFICIENCIES.keys()))
+    return random.choice(Proficiencies.entries)
 
 
 def random_equipment():
-    return random.choice(list(EQUIPMENT.keys()))
+    return random.choice(Equipment.entries)
 
 
 def random_character_class():
-    return random.choice(list(CHARACTER_CLASSES.keys()))
+    return random.choice(Classes.entries)
 
 
 def random_species():
-    return random.choice(list(SPECIES.keys()))
+    return random.choice(Species.entries).capitalize()
+
 
 
 def hp(level, character_class, constitution):
-    hit_die = CHARACTER_CLASSES[character_class]['hit_die']
+    char_class = getattr(Classes, character_class)
+    hit_die = char_class.hit_die
     constitution_modifier = modifier(constitution)
-    level_1_hp = int(hit_die.replace("d", "")) + constitution_modifier
+    level_1_hp = hit_die + constitution_modifier
     if level == 1:
         return level_1_hp
     char_hp = level_1_hp
     number_of_rolls = level - 1
-    die_roll = f"{number_of_rolls}{hit_die}"
+    die_roll = f"{number_of_rolls}d{hit_die}"
     hit_die_total = roll.dice(die_roll)
     char_hp += hit_die_total
     constitution_bonus = constitution_modifier * number_of_rolls
@@ -166,9 +203,10 @@ def stat_generator():
 def create_random_character():
     char_class = random_character_class()
     species = random_species()
-    fictional_names_race = SPECIES[species]["fictional_names_race"]
+    print(species)
+    fictional_names_species = SPECIES[species]["fictional_names_species"]
     sex = random.choice(['male', 'female']).capitalize()
-    name = names(gender=sex, style=fictional_names_race)
+    name = names(gender=sex, style=fictional_names_species)
     my_character = Character(name=name, species=species, char_class=char_class, sex=sex)
     my_character.level = roll.d20()
     my_character.roll_stats()
@@ -177,14 +215,14 @@ def create_random_character():
     return my_character
 
 
-def create_character(name, species, character_class, sex, level):
-    if species not in list(SPECIES.keys()):
-        raise Exception("Specified Species Not Supported")
-    if character_class not in list(CHARACTER_CLASSES.keys()):
-        raise Exception("Specified Character Class Not Supported")
-    my_character = Character(name=name, char_class=character_class, sex=sex, species=species)
-    my_character.level = level
-    my_character.roll_stats()
-    my_character.add_proficiency(random_proficiency())
-    my_character.add_equipment(random_equipment())
-    return my_character
+# def create_character(name, species, character_class, sex, level):
+#     if species not in list(SPECIES.keys()):
+#         raise Exception("Specified Species Not Supported")
+#     if character_class not in list(CHARACTER_CLASSES.keys()):
+#         raise Exception("Specified Character Class Not Supported")
+#     my_character = Character(name=name, char_class=character_class, sex=sex, species=species)
+#     my_character.level = level
+#     my_character.roll_stats()
+#     my_character.add_proficiency(random_proficiency())
+#     my_character.add_equipment(random_equipment())
+#     return my_character
