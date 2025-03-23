@@ -1,7 +1,10 @@
 import roll
 import api_srd
 import random
+from fpdf import FPDF
 from fictional_names import name_generator
+from reportlab.pdfgen.canvas import Canvas
+from reportlab.lib.pagesizes import LETTER
 names = name_generator.generate_name
 
 
@@ -116,6 +119,26 @@ class Character:
         Equipment: {self.equipment}
         """
         print(character_sheet)
+
+    def create_pdf_file(self):
+        pdf_filename = "Character Sheet.pdf"
+        pdf = FPDF('portrait', 'in', 'letter')
+        pdf.add_page()
+        pdf.set_font('Arial', 'B', 16)
+        pdf.cell(.5, 1, self.name)
+        pdf.line(.3, 1, 3, 1)
+        pdf.line(.3, 1.5, 3, 1.5)
+        pdf.set_font('Arial', '', 8)
+        # pdf.cell(1.5, 1.4, "Character Name")
+        # pdf.cell(w=0, h=0, align="L", txt="Character Name")
+        pdf.text(x=.3, y=1.1, txt="Character Name")
+        pdf.output(name=pdf_filename)
+        # canvas = Canvas(pdf, pagesize=LETTER)
+        # canvas.drawString(72, 700, f"{self.name}")
+        # canvas.drawString(72, 650, f"{self.char_class}")
+        # canvas.drawString(72, 600, f"{self.species}")
+        # canvas.save()
+        return
 
 
 def modifier(ability_score):

@@ -1,3 +1,5 @@
 fictional_names
 tinys_srd
 requests
+reportlab
+fpdf
