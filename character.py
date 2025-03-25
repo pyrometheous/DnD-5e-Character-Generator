@@ -1,29 +1,38 @@
 import roll
-import api_srd
-import tinys_srd
+# import api_srd
+# import tinys_srd
+from tinys_srd import Classes
 import random
 import urllib.request
 from fillpdf import fillpdfs
 from fictional_names import name_generator
-from os import remove
+# from os import remove
 
 
 names = name_generator.generate_name
 
-CHARACTER_CLASSES = {
-    "Barbarian": {
-        "hit_die": "d12"
-    },
-    "Fighter": {
-        "hit_die": "d10"
-    },
-    "Monk": {
-        "hit_die": "d8"
-    },
-    "Ranger": {
-        "hit_die": "d10"
+# CHARACTER_CLASSES = {
+#     "Barbarian": {
+#         # "hit_die": f"d{tinys_srd.Classes.barbarian.hit_die}"
+#     },
+#     "Fighter": {
+#         "hit_die": "d10"
+#     },
+#     "Monk": {
+#         "hit_die": "d8"
+#     },
+#     "Ranger": {
+#         "hit_die": "d10"
+#     }
+# }
+AVAILABLE_CLASSES = Classes.entries
+
+CHARACTER_CLASSES = {}
+for CHARACTER_CLASS in AVAILABLE_CLASSES:
+    CHARACTER_CLASSES[CHARACTER_CLASS.capitalize()] = {
+        "hit_die": f"d{getattr(Classes, CHARACTER_CLASS).hit_die}"
     }
-}
+
 
 EQUIPMENT = {
     "Longbow": {
@@ -58,6 +67,18 @@ SPECIES = {
     },
     "Gnome": {
         "fictional_names_race": "gnomish"
+    }
+}
+
+
+PDF_SAVING_THROWS = {
+    'strength': {
+        'checkbox': "Check Box 11",
+        'value': 'ST Strength'
+    },
+    'dexterity': {
+        'checkbox': "Check Box 18",
+        'value': 'ST Dexterity'
     }
 }
 
@@ -121,8 +142,8 @@ class Character:
         print(character_sheet)
 
     def create_pdf_file(self):
-        input_pdf_filename = "Character Sheet.pdf"
-        output_pdf_filename = f"Populated {input_pdf_filename}"
+        input_pdf_filename = "./Character Sheet.pdf"
+        output_pdf_filename = f"./Populated {input_pdf_filename.replace('./', '')}"
         urllib.request.urlretrieve("https://media.wizards.com/2022/dnd/downloads/DnD_5E_CharacterSheet_FormFillable.pdf", input_pdf_filename)
         fillpdfs.get_form_fields(input_pdf_filename)
         fields = {
@@ -213,7 +234,7 @@ def create_random_character():
 def create_character(name, species, character_class, sex, level):
     if species not in list(SPECIES.keys()):
         raise Exception("Specified Species Not Supported")
-    if character_class not in list(CHARACTER_CLASSES.keys()):
+    if character_class not in AVAILABLE_CLASSES:
         raise Exception("Specified Character Class Not Supported")
     my_character = Character(name=name, char_class=character_class, sex=sex, species=species)
     my_character.level = level
