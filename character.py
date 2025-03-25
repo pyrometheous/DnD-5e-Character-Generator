@@ -1,12 +1,14 @@
 import roll
 import api_srd
+import tinys_srd
 import random
-from fpdf import FPDF
+import urllib.request
+from fillpdf import fillpdfs
 from fictional_names import name_generator
-from reportlab.pdfgen.canvas import Canvas
-from reportlab.lib.pagesizes import LETTER
-names = name_generator.generate_name
+from os import remove
 
+
+names = name_generator.generate_name
 
 CHARACTER_CLASSES = {
     "Barbarian": {
@@ -29,13 +31,11 @@ EQUIPMENT = {
     }
 }
 
-
 PROFICIENCIES = {
     "Stealth": {
         "dex": 2
     }
 }
-
 
 SPECIES = {
     "Human": {
@@ -121,22 +121,32 @@ class Character:
         print(character_sheet)
 
     def create_pdf_file(self):
-        pdf_filename = "Character Sheet.pdf"
-        pdf = FPDF('portrait', 'in', 'letter')
-        pdf.add_page()
-        pdf.set_font('Arial', 'B', 16)
-        # pdf.cell(.5, 1, self.name)
-        pdf.text(x=.3, y=1, txt=self.name)
-        pdf.text(x=.3, y=1.5, txt=self.char_class)
-        pdf.text(x=1.7, y=1.5, txt=self.species)
-        pdf.line(.3, 1, 3, 1)
-        pdf.line(.3, 1.5, 1.5, 1.5)
-        pdf.line(1.7, 1.5, 3, 1.5)
-        pdf.set_font('Arial', '', 8)
-        pdf.text(x=.3, y=1.1, txt="Character Name")
-        pdf.text(x=.3, y=1.6, txt="Class")
-        pdf.text(x=2, y=1.6, txt="Species")
-        pdf.output(name=pdf_filename)
+        input_pdf_filename = "Character Sheet.pdf"
+        output_pdf_filename = f"Populated {input_pdf_filename}"
+        urllib.request.urlretrieve("https://media.wizards.com/2022/dnd/downloads/DnD_5E_CharacterSheet_FormFillable.pdf", input_pdf_filename)
+        fillpdfs.get_form_fields(input_pdf_filename)
+        fields = {
+            "CharacterName": self.name,
+            "CharacterName 2": self.name,
+            "ClassLevel": f"{self.char_class}  {self.level}",
+            "Race ": self.species,
+            "HPMax": self.hp,
+            "STR": self.strength,
+            "STRmod": modifier(self.strength),
+            "DEX": self.dexterity,
+            "DEXmod ": modifier(self.dexterity),
+            "CON": self.constitution,
+            "CONmod": modifier(self.constitution),
+            "INT": self.intelligence,
+            "INTmod": modifier(self.intelligence),
+            "WIS": self.wisdom,
+            "WISmod": modifier(self.wisdom),
+            "CHA": self.charisma,
+            "CHamod": modifier(self.charisma),
+        }
+        fillpdfs.write_fillable_pdf(input_pdf_filename, output_pdf_filename, fields)
+        fillpdfs.flatten_pdf(output_pdf_filename, output_pdf_filename, as_images=False)
+        # remove(input_pdf_filename)
         return
 
 
