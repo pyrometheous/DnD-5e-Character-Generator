@@ -4,8 +4,8 @@ import roll
 
 def main():
     new_character = character.create_random_character()
-    new_character.display_character_sheet()
-    # new_character.create_pdf_file()
+    # new_character.display_character_sheet()
+    new_character.create_pdf_file()
     return
 
 

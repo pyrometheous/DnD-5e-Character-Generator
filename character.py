@@ -1,10 +1,10 @@
 import roll
 # import api_srd
 # import tinys_srd
-from tinys_srd import Classes
+# from tinys_srd import Classes
 
-# from tinys_srd import Classes, Equipment, Proficiencies
-# from tinys_srd import Races as Species
+from tinys_srd import Classes, Equipment, Proficiencies
+from tinys_srd import Races as Species
 
 import random
 import urllib.request
@@ -21,6 +21,7 @@ CHARACTER_CLASSES = {}
 for CHARACTER_CLASS in AVAILABLE_CLASSES:
     CHARACTER_CLASSES[CHARACTER_CLASS.capitalize()] = {
         "hit_die": f"d{getattr(Classes, CHARACTER_CLASS).hit_die}"
+    }
 
 EQUIPMENT = {
     "Longbow": {
@@ -73,15 +74,32 @@ SPECIES = {
 
 
 PDF_SAVING_THROWS = {
-    'strength': {
+    'STR': {
         'checkbox': "Check Box 11",
         'value': 'ST Strength'
     },
-    'dexterity': {
+    'DEX': {
         'checkbox': "Check Box 18",
         'value': 'ST Dexterity'
+    },
+    'CON': {
+        'checkbox': "Check Box 19",
+        'value': "ST Constitution",
+    },
+    'INT': {
+        'checkbox': "Check Box 20",
+        'value': "ST Intelligence",
+    },
+    'WIS': {
+        'checkbox': "Check Box 21",
+        'value': "ST Wisdom",
+    },
+    'CHA': {
+        'checkbox': "Check Box 22",
+        'value': "ST Charisma",
     }
 }
+
 
 
 class Character:
@@ -90,6 +108,7 @@ class Character:
         self.species = species
         self.sex = sex
         self.char_class = char_class
+        self.hit_die = ''
         self.strength = 0
         self.dexterity = 0
         self.constitution = 0
@@ -100,6 +119,11 @@ class Character:
         self.level = 1
         self.proficiencies = []
         self.equipment = []
+    
+    def get_hit_die(self):
+        char_class = getattr(Classes, character_class)
+        hit_die = char_class.hit_die
+        return f"d{hit_die}"
 
     def roll_stats(self):
         self.strength = stat_generator()
@@ -169,7 +193,23 @@ class Character:
             "WISmod": modifier(self.wisdom),
             "CHA": self.charisma,
             "CHamod": modifier(self.charisma),
+            "HD": self.hit_die,
+            "HDTotal": self.hit_die_total
+
         }
+        for saving_throw in PDF_SAVING_THROWS:
+            saving_throw_index = getattr(Classes, self.char_class)
+            saving_throws = saving_throw_index.saving_throws
+            for st in saving_throws:
+                saving_throw_key = st["name"]
+                print(saving_throw_key)
+                print(PDF_SAVING_THROWS.keys())
+                if saving_throw_key in PDF_SAVING_THROWS.keys():
+                    checkbox = PDF_SAVING_THROWS[saving_throw_key]['checkbox']
+                    value = PDF_SAVING_THROWS[saving_throw_key]['value']
+                    fields[checkbox] = 'Yes'
+                    fields[value] = ''
+        print(fields)
         fillpdfs.write_fillable_pdf(input_pdf_filename, output_pdf_filename, fields)
 #         fillpdfs.flatten_pdf(output_pdf_filename, output_pdf_filename, as_images=False)
 #         remove(input_pdf_filename)
