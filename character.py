@@ -3,7 +3,7 @@ import roll
 # import tinys_srd
 # from tinys_srd import Classes
 
-from tinys_srd import Classes, Equipment, Proficiencies
+from tinys_srd import Classes, Equipment, Proficiencies, Levels
 from tinys_srd import Races as Species
 
 import random
@@ -103,12 +103,12 @@ PDF_SAVING_THROWS = {
 
 
 class Character:
-    def __init__(self, name, species, char_class, sex):
+    def __init__(self, name, species, char_class, sex, level):
         self.name = name
         self.species = species
         self.sex = sex
         self.char_class = char_class
-        self.hit_die = ''
+        self.level = int(level)
         self.strength = 0
         self.dexterity = 0
         self.constitution = 0
@@ -116,14 +116,18 @@ class Character:
         self.wisdom = 0
         self.charisma = 0
         self.hp = 0
-        self.level = 1
+        char_class_attribute = getattr(Classes, self.char_class)
+        self.hit_die = f'd{char_class_attribute.hit_die}'
         self.proficiencies = []
         self.equipment = []
-    
-    def get_hit_die(self):
-        char_class = getattr(Classes, character_class)
-        hit_die = char_class.hit_die
-        return f"d{hit_die}"
+
+    def hit_die_total(self):
+        return f"{self.level - 1}{self.hit_die}"
+        
+    def proficiency_bonus(self):
+        class_levels = getattr(Levels, f"{self.char_class}_{self.level}")
+        proficiency_bonus = class_levels.prof_bonus
+        return proficiency_bonus
 
     def roll_stats(self):
         self.strength = stat_generator()
@@ -132,7 +136,7 @@ class Character:
         self.intelligence = stat_generator()
         self.wisdom = stat_generator()
         self.charisma = stat_generator()
-        self.hp = hp(level=self.level, character_class=self.char_class, constitution=self.constitution)
+        self.hp = hp(level=self.level, character_class=self.char_class, constitution=self.constitution, hit_die=self.hit_die)
         pass
 
     def level_up(self):
@@ -145,7 +149,7 @@ class Character:
     def add_equipment(self, equipment):
         self.equipment.append(equipment)
 
-    def get_equipment_name(self, equipment):
+    def equipment_name(self, equipment):
         equipment_index = getattr(Equipment, equipment)
         return equipment_index.name
 
@@ -165,8 +169,10 @@ class Character:
         Intelligence: {self.intelligence} Mod: {modifier(self.intelligence)}
         Wisdom: {self.wisdom} Mod: {modifier(self.wisdom)}
         Charisma: {self.charisma} Mod: {modifier(self.charisma)}
+        Hit Die: {self.hit_die_total()}
+        
         Proficiencies: {self.proficiencies}
-        Equipment: {self.get_equipment_name(self.equipment[0])}
+        Equipment: {self.equipment_name(self.equipment[0])}
         """
         print(character_sheet)
 
@@ -175,11 +181,13 @@ class Character:
         output_pdf_filename = f"./Populated {input_pdf_filename.replace('./', '')}"
         urllib.request.urlretrieve("https://media.wizards.com/2022/dnd/downloads/DnD_5E_CharacterSheet_FormFillable.pdf", input_pdf_filename)
         fillpdfs.get_form_fields(input_pdf_filename)
+
+        # Name, Class, Species/Race, Ability Scores, and Modifiers
         fields = {
             "CharacterName": self.name,
             "CharacterName 2": self.name,
-            "ClassLevel": f"{self.char_class}  {self.level}",
-            "Race ": self.species,
+            "ClassLevel": f"{self.char_class.capitalize()}  {self.level}",
+            "Race ": self.species.replace('_', '-'),
             "HPMax": self.hp,
             "STR": self.strength,
             "STRmod": modifier(self.strength),
@@ -194,22 +202,24 @@ class Character:
             "CHA": self.charisma,
             "CHamod": modifier(self.charisma),
             "HD": self.hit_die,
-            "HDTotal": self.hit_die_total
-
+            "HDTotal": str(self.hit_die_total())
         }
+
+        # Proficiency_bonus
+        fields['ProfBonus'] = self.proficiency_bonus()
+
+        # Saving Throws
         for saving_throw in PDF_SAVING_THROWS:
             saving_throw_index = getattr(Classes, self.char_class)
             saving_throws = saving_throw_index.saving_throws
             for st in saving_throws:
                 saving_throw_key = st["name"]
-                print(saving_throw_key)
-                print(PDF_SAVING_THROWS.keys())
                 if saving_throw_key in PDF_SAVING_THROWS.keys():
                     checkbox = PDF_SAVING_THROWS[saving_throw_key]['checkbox']
                     value = PDF_SAVING_THROWS[saving_throw_key]['value']
                     fields[checkbox] = 'Yes'
                     fields[value] = ''
-        print(fields)
+        
         fillpdfs.write_fillable_pdf(input_pdf_filename, output_pdf_filename, fields)
 #         fillpdfs.flatten_pdf(output_pdf_filename, output_pdf_filename, as_images=False)
 #         remove(input_pdf_filename)
@@ -237,17 +247,16 @@ def random_species():
 
 
 
-def hp(level, character_class, constitution):
-    char_class = getattr(Classes, character_class)
-    hit_die = char_class.hit_die
+def hp(level, character_class, constitution, hit_die):
     constitution_modifier = modifier(constitution)
-    level_1_hp = hit_die + constitution_modifier
+    hit_dice = int(hit_die.replace('d', ''))
+    level_1_hp = hit_dice + constitution_modifier
     if level == 1:
         return level_1_hp
     char_hp = level_1_hp
     number_of_rolls = level - 1
-    die_roll = f"{number_of_rolls}d{hit_die}"
-    hit_die_total = roll.dice(die_roll)
+    dice_roll = f"{number_of_rolls}{hit_die}"
+    hit_die_total = roll.dice(dice_roll)
     char_hp += hit_die_total
     constitution_bonus = constitution_modifier * number_of_rolls
     char_hp += constitution_bonus
@@ -267,12 +276,11 @@ def stat_generator():
 def create_random_character():
     char_class = random_character_class()
     species = random_species()
-    print(species)
     fictional_names_species = SPECIES[species]["fictional_names_species"]
     sex = random.choice(['male', 'female']).capitalize()
     name = names(gender=sex, style=fictional_names_species)
-    my_character = Character(name=name, species=species, char_class=char_class, sex=sex)
-    my_character.level = roll.d20()
+    my_character = Character(name=name, species=species, char_class=char_class, sex=sex, level=roll.d20())
+    # my_character.level = roll.d20()
     my_character.roll_stats()
     my_character.add_proficiency(random_proficiency())
     my_character.add_equipment(random_equipment())
@@ -284,10 +292,9 @@ def create_character(name, species, character_class, sex, level):
         raise Exception("Specified Species Not Supported")
     if character_class not in AVAILABLE_CLASSES:
         raise Exception("Specified Character Class Not Supported")
-    my_character = Character(name=name, char_class=character_class, sex=sex, species=species)
+    my_character = Character(name=name, char_class=character_class, sex=sex, species=species, level=level)
     my_character.level = level
     my_character.roll_stats()
     my_character.add_proficiency(random_proficiency())
     my_character.add_equipment(random_equipment())
-    return my_character
-
+    
