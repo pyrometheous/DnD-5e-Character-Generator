@@ -481,16 +481,56 @@ SPELL_SHEET_PREFIXES = (
 )
 
 SPELLBOOK_FIELD_MAP = {
-    0: [f'Spells 10{i}' for i in range(14, 23)],
-    1: [f'Spells 10{i}' for i in range(23, 34)],
-    2: [f'Spells 10{i}' for i in range(34, 47)],
-    3: [f'Spells 10{i}' for i in range(47, 60)],
-    4: [f'Spells 10{i}' for i in range(60, 73)],
-    5: [f'Spells 10{i}' for i in range(73, 82)],
-    6: [f'Spells 10{i}' for i in range(82, 91)],
-    7: [f'Spells 10{i}' for i in range(91, 100)],
-    8: [f'Spells 10{i}' for i in range(100, 107)],
-    9: [f'Spells 10{i}' for i in range(107, 114)],
+    0: [
+        'Spells 1014', 'Spells 1016', 'Spells 1017', 'Spells 1018',
+        'Spells 1019', 'Spells 1020', 'Spells 1021', 'Spells 1022',
+    ],
+    1: [
+        'Spells 1015', 'Spells 1023', 'Spells 1024', 'Spells 1025',
+        'Spells 1026', 'Spells 1027', 'Spells 1028', 'Spells 1029',
+        'Spells 1030', 'Spells 1031', 'Spells 1032', 'Spells 1033',
+    ],
+    2: [
+        'Spells 1046', 'Spells 1034', 'Spells 1035', 'Spells 1036',
+        'Spells 1037', 'Spells 1038', 'Spells 1039', 'Spells 1040',
+        'Spells 1041', 'Spells 1042', 'Spells 1043', 'Spells 1044',
+        'Spells 1045',
+    ],
+    3: [
+        'Spells 1048', 'Spells 1047', 'Spells 1049', 'Spells 1050',
+        'Spells 1051', 'Spells 1052', 'Spells 1053', 'Spells 1054',
+        'Spells 1055', 'Spells 1056', 'Spells 1057', 'Spells 1058',
+        'Spells 1059',
+    ],
+    4: [
+        'Spells 1061', 'Spells 1060', 'Spells 1062', 'Spells 1063',
+        'Spells 1064', 'Spells 1065', 'Spells 1066', 'Spells 1067',
+        'Spells 1068', 'Spells 1069', 'Spells 1070', 'Spells 1071',
+        'Spells 1072',
+    ],
+    5: [
+        'Spells 1074', 'Spells 1073', 'Spells 1075', 'Spells 1076',
+        'Spells 1077', 'Spells 1078', 'Spells 1079', 'Spells 1080',
+        'Spells 1081',
+    ],
+    6: [
+        'Spells 1083', 'Spells 1082', 'Spells 1084', 'Spells 1085',
+        'Spells 1086', 'Spells 1087', 'Spells 1088', 'Spells 1089',
+        'Spells 1090',
+    ],
+    7: [
+        'Spells 1092', 'Spells 1091', 'Spells 1093', 'Spells 1094',
+        'Spells 1095', 'Spells 1096', 'Spells 1097', 'Spells 1098',
+        'Spells 1099',
+    ],
+    8: [
+        'Spells 10101', 'Spells 10100', 'Spells 10102', 'Spells 10103',
+        'Spells 10104', 'Spells 10105', 'Spells 10106',
+    ],
+    9: [
+        'Spells 10108', 'Spells 10107', 'Spells 10109', 'Spells 101010',
+        'Spells 101011', 'Spells 101012', 'Spells 101013',
+    ],
 }
 
 
@@ -508,9 +548,7 @@ def apply_spellbook_fields(fields, spellbook):
         if not available_fields:
             continue
 
-        # The 1st-level section has a built-in placeholder on its first line.
-        start_index = 1 if level == 1 else 0
-        for field_name, spell in zip(available_fields[start_index:], spells):
+        for field_name, spell in zip(available_fields, spells):
             fields[field_name] = spell['name']
 
 
