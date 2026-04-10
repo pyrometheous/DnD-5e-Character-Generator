@@ -34,6 +34,7 @@ Running with no arguments generates a single character with a random class, spec
 | `--font` | string | Random | Fantasy font for the PDF. |
 | `--characters` | int | 1 | Number of characters to generate. |
 | `--balance` | flag | Off | Build a theoretically balanced party for the requested group size. |
+| `--spellbook` | flag | Off | Generate a random class-appropriate spellbook for spellcasting classes. |
 
 ### Valid Values
 
@@ -71,6 +72,9 @@ python3 main.py --level 10 --characters 5 --balance
 # A balanced party built around a fighter and wizard
 python3 main.py --level 8 --characters 4 --balance --class fighter,wizard
 
+# A level-10 wizard with a random spellbook
+python3 main.py --class wizard --level 10 --spellbook
+
 # 3 random-level Wizards
 python3 main.py --class wizard --characters 3
 ```
@@ -82,5 +86,7 @@ Each character produces:
 - A filled PDF saved to the current directory as `<Name>_Character_Sheet.pdf`
 
 The PDF is based on the official WotC D&D 5E form-fillable character sheet and includes ability scores, saving throws, skills, equipment, proficiencies, languages, features, traits, and spell slots (for caster classes).
+
+If you use `--spellbook`, the generator also writes a plain-text spellbook file with random class-appropriate 5e spells for the generated caster.
 
 Balanced party templates and class-role tuning live in `config/party_balance_rules.json`, so you can manually fine-tune what combinations the generator prefers.
