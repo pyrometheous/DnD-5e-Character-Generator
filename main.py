@@ -23,6 +23,13 @@ def main():
         choices=[s.capitalize() for s in Species.entries],
         help="Character species/race. Random if not specified."
     )
+    font_names = list(character.AVAILABLE_FONTS.keys())
+    font_help_lines = [f"  {k}: {v['desc']}" for k, v in character.AVAILABLE_FONTS.items()]
+    parser.add_argument(
+        '--font', type=str, default=None,
+        choices=font_names,
+        help="Fantasy font for the PDF. Choices: " + ', '.join(font_names)
+    )
     args = parser.parse_args()
 
     new_character = character.create_random_character(
@@ -31,7 +38,7 @@ def main():
         species=args.species,
     )
     new_character.display_character_sheet()
-    new_character.create_pdf_file()
+    new_character.create_pdf_file(font_name=args.font)
 
 
 if __name__ == "__main__":

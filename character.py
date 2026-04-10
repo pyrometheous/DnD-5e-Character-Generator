@@ -4,9 +4,14 @@ from tinys_srd import Classes, Equipment, Proficiencies, Levels
 from tinys_srd import Races as Species
 
 import random
+import re
+import io
+import os
 import urllib.request
+import zipfile
 from fillpdf import fillpdfs
 from fictional_names import name_generator
+import fitz
 
 
 names = name_generator.generate_name
@@ -69,6 +74,18 @@ SPELLCASTING_ABILITY = {
     'paladin': 'charisma', 'ranger': 'wisdom', 'sorcerer': 'charisma',
     'warlock': 'charisma', 'wizard': 'intelligence',
 }
+
+AVAILABLE_FONTS = {
+    'cinzel':        {'css': 'Cinzel:wght@400;700',         'desc': 'Elegant serif, great readability'},
+    'medievalsharp': {'css': 'MedievalSharp',                'desc': 'Whimsical medieval script'},
+    'almendra':      {'css': 'Almendra:wght@400;700',        'desc': 'Fantasy serif inspired by calligraphy'},
+    'metamorphous':  {'css': 'Metamorphous',                 'desc': 'Dark fantasy display font'},
+    'pirataone':     {'css': 'Pirata+One',                   'desc': 'Pirate/adventure theme'},
+    'imfell':        {'css': 'IM+Fell+English+SC',           'desc': 'Historic English printing style'},
+    'uncialantiqua': {'css': 'Uncial+Antiqua',               'desc': 'Celtic/uncial manuscript style'},
+}
+
+FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.fonts')
 
 
 
@@ -174,6 +191,24 @@ class Character:
             mod += self.proficiency_bonus()
         return mod
 
+    def populate_proficiencies(self):
+        """Add class armor/weapon/tool proficiencies and racial proficiencies."""
+        cls = getattr(Classes, self.char_class)
+        for p in cls.proficiencies:
+            name = p['name']
+            # Skip saving throws (tracked separately)
+            if name.startswith('Saving Throw:'):
+                continue
+            if name not in self.proficiencies:
+                self.proficiencies.append(name)
+        # Racial starting proficiencies
+        species_key = self.species.lower()
+        race_data = getattr(Species, species_key)
+        for p in race_data.starting_proficiencies:
+            name = p['name']
+            if name not in self.proficiencies:
+                self.proficiencies.append(name)
+
     def roll_stats(self):
         self.strength = stat_generator()
         self.dexterity = stat_generator()
@@ -183,6 +218,7 @@ class Character:
         self.charisma = stat_generator()
         self.apply_racial_bonuses()
         self.choose_skill_proficiencies()
+        self.populate_proficiencies()
         self.apply_asi()
         self.hp = hp(level=self.level, constitution=self.constitution,
                      hit_die=self.hit_die)
@@ -226,7 +262,7 @@ class Character:
         """
         print(character_sheet)
 
-    def create_pdf_file(self):
+    def create_pdf_file(self, font_name=None):
         input_pdf_filename = "./Character Sheet.pdf"
         output_pdf_filename = f"./{self.name.replace(' ', '_')}_Character_Sheet.pdf"
         urllib.request.urlretrieve(
@@ -243,7 +279,6 @@ class Character:
             "ClassLevel": f"{self.char_class.capitalize()}  {self.level}",
             "Race ": self.species.replace('_', '-'),
             "HPMax": self.hp,
-            "HPCurrent": self.hp,
             "STR": self.strength,
             "STRmod": modifier(self.strength),
             "DEX": self.dexterity,
@@ -281,35 +316,35 @@ class Character:
             if skill_name in self.skill_proficiencies:
                 fields[skill_info['checkbox']] = 'Yes'
 
-        # Equipment list
-        equip_names = []
+        # Equipment list (deduplicated, with quantities)
+        equip_counts = {}
         for eq in self.equipment:
             try:
-                equip_names.append(self.equipment_name(eq))
+                name = self.equipment_name(eq)
             except AttributeError:
-                equip_names.append(eq)
-        # Also add starting equipment from class
-        cls = getattr(Classes, self.char_class)
-        for item in cls.starting_equipment:
-            name = item['equipment']['name']
-            qty = item['quantity']
-            equip_names.append(f"{name} x{qty}" if qty > 1 else name)
-        fields['Equipment'] = '\n'.join(equip_names)
+                name = eq
+            equip_counts[name] = equip_counts.get(name, 0) + 1
+        equip_lines = []
+        for name, qty in equip_counts.items():
+            equip_lines.append(f"{name} x{qty}" if qty > 1 else name)
+        fields['Equipment'] = '\n'.join(equip_lines)
 
-        # Proficiencies and Languages
+        # Proficiencies and Languages (one per line)
         prof_list = []
         for p in self.proficiencies:
-            try:
-                prof_data = getattr(Proficiencies, p)
-                prof_list.append(prof_data.name)
-            except AttributeError:
-                prof_list.append(p)
+            prof_list.append(p)
         languages = self.get_languages()
         traits = self.get_traits()
-        fields['ProficienciesLang'] = (
-            "Proficiencies: " + ', '.join(prof_list) + '\n' +
-            "Languages: " + ', '.join(languages)
-        )
+        prof_lines = ['Proficiencies:']
+        for p in prof_list:
+            prof_lines.append(f'  {p}')
+        if not prof_list:
+            prof_lines.extend(['  ', '  ', '  '])
+        prof_lines.append('')
+        prof_lines.append('Languages:')
+        for lang in languages:
+            prof_lines.append(f'  {lang}')
+        fields['ProficienciesLang'] = '\n'.join(prof_lines)
 
         # Features and Traits
         features = self.get_features()
@@ -367,12 +402,158 @@ class Character:
                         fields[field_name] = slots
 
         fillpdfs.write_fillable_pdf(input_pdf_filename, output_pdf_filename, fields)
+
+        if font_name is None:
+            font_name = random.choice(list(AVAILABLE_FONTS.keys()))
+        apply_custom_font(output_pdf_filename, font_name)
+
         print(f"Character sheet saved to: {output_pdf_filename}")
         return
 
 
 def modifier(ability_score):
     return (ability_score - 10) // 2
+
+
+def download_font(font_name):
+    """Download a Google Font and return the path to the .ttf file."""
+    font_name = font_name.lower()
+    if font_name not in AVAILABLE_FONTS:
+        raise ValueError(
+            f"Unknown font '{font_name}'. Available: {', '.join(AVAILABLE_FONTS.keys())}"
+        )
+
+    os.makedirs(FONTS_DIR, exist_ok=True)
+    cached = os.path.join(FONTS_DIR, f"{font_name}.ttf")
+    if os.path.exists(cached):
+        return cached
+
+    css_family = AVAILABLE_FONTS[font_name]['css']
+    css_url = f"https://fonts.googleapis.com/css2?family={css_family}"
+    req = urllib.request.Request(
+        css_url, headers={'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64)'}
+    )
+    css = urllib.request.urlopen(req).read().decode('utf-8')
+    ttf_urls = re.findall(r'url\((https://fonts\.gstatic\.com/[^)]+\.ttf)\)', css)
+    if not ttf_urls:
+        raise RuntimeError(f"Could not find .ttf URL for font '{font_name}'")
+
+    # Prefer the bold variant if available (index 1 for weight@400;700 families)
+    # otherwise take the first/only variant
+    ttf_url = ttf_urls[-1] if len(ttf_urls) > 1 else ttf_urls[0]
+    urllib.request.urlretrieve(ttf_url, cached)
+    return cached
+
+
+# Fields where we want larger text rendered (ability scores, big numbers)
+LARGE_FIELDS = {
+    'STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA',
+    'AC', 'HPMax', 'Speed', 'Passive',
+}
+
+# Fields that need medium text (modifiers, bonuses)
+MEDIUM_FIELDS = {
+    'STRmod', 'DEXmod ', 'CONmod', 'INTmod', 'WISmod', 'CHamod',
+    'ProfBonus', 'Initiative',
+}
+
+# Saving throw and skill value fields - need readable sizing
+SMALL_VALUE_FIELDS = set()
+for _st_info in PDF_SAVING_THROWS.values():
+    SMALL_VALUE_FIELDS.add(_st_info['value'])
+for _sk_info in SKILLS.values():
+    SMALL_VALUE_FIELDS.add(_sk_info['field'])
+
+# Text box fields that need larger readable text
+TEXTBOX_FIELDS = {
+    'Features and Traits', 'Feat+Traits', 'ProficienciesLang',
+    'Equipment', 'AttacksSpellcasting',
+}
+
+
+def apply_custom_font(pdf_path, font_name):
+    """Replace form field text with custom-font rendered text via pymupdf."""
+    font_path = download_font(font_name)
+    font_obj = fitz.Font(fontfile=font_path)
+
+    doc = fitz.open(pdf_path)
+    for page in doc:
+        # Collect text widget data, then delete them to remove old rendering
+        widgets_data = []
+        widgets_to_delete = []
+        for w in page.widgets():
+            if w.field_type == fitz.PDF_WIDGET_TYPE_TEXT:
+                if w.field_value:
+                    widgets_data.append({
+                        'name': w.field_name,
+                        'value': str(w.field_value),
+                        'rect': w.rect,
+                    })
+                widgets_to_delete.append(w)
+
+        if not widgets_data:
+            continue
+
+        # Delete ALL text widgets (removes their appearance streams entirely)
+        for w in widgets_to_delete:
+            page.delete_widget(w)
+
+        # Draw text at each field's position with the custom font
+        for wd in widgets_data:
+            rect = wd['rect']
+            value = wd['value']
+            height = rect.height
+            name = wd['name']
+
+            # Scale font size based on field type
+            if name in LARGE_FIELDS:
+                fontsize = height * 0.75
+            elif name in MEDIUM_FIELDS:
+                fontsize = height * 0.85
+            elif name in SMALL_VALUE_FIELDS:
+                # Saving throws and skill values - maximize readability
+                fontsize = height * 0.95
+            elif name in TEXTBOX_FIELDS:
+                fontsize = 9
+            else:
+                fontsize = min(height * 0.75, 11)
+
+            # For multiline fields, use insert_textbox
+            if '\n' in value:
+                if name in TEXTBOX_FIELDS:
+                    fontsize = 9
+                page.insert_textbox(
+                    rect, value,
+                    fontname="custom", fontfile=font_path,
+                    fontsize=fontsize, align=fitz.TEXT_ALIGN_LEFT,
+                )
+                continue
+
+            # Calculate position for single-line text
+            text_width = font_obj.text_length(value, fontsize=fontsize)
+
+            # Shrink to fit if text overflows the rect
+            if text_width > rect.width - 2:
+                fontsize = fontsize * (rect.width - 2) / text_width
+                text_width = font_obj.text_length(value, fontsize=fontsize)
+
+            if name in LARGE_FIELDS or name in MEDIUM_FIELDS or name in SMALL_VALUE_FIELDS:
+                x = rect.x0 + (rect.width - text_width) / 2
+            else:
+                x = rect.x0 + 1
+
+            y = rect.y0 + (rect.height + fontsize) / 2 - 1
+
+            page.insert_text(
+                fitz.Point(x, y), value,
+                fontname="custom", fontfile=font_path,
+                fontsize=fontsize,
+            )
+
+    tmp_path = pdf_path + '.tmp'
+    doc.save(tmp_path, garbage=4, deflate=True)
+    doc.close()
+    os.replace(tmp_path, pdf_path)
 
 
 def random_character_class():
