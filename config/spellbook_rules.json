@@ -1,0 +1,108 @@
+{
+  "prepared_spellcasting_abilities": {
+    "cleric": "wisdom",
+    "druid": "wisdom",
+    "paladin": "charisma",
+    "wizard": "intelligence"
+  },
+  "limited_caster_classes": ["paladin", "ranger", "warlock"],
+  "default_base_spells_per_level": 2,
+  "limited_caster_base_spells_per_level": 1,
+  "species_capabilities": {
+    "Human": [],
+    "Elf": ["darkvision", "keen_senses", "fey_ancestry", "trance"],
+    "Halfling": ["brave", "halfling_nimbleness", "lucky"],
+    "Dwarf": ["darkvision", "poison_resistance", "stonecunning", "dwarven_weapon_training", "tool_proficiency"],
+    "Gnome": ["darkvision", "gnome_cunning"],
+    "Half_elf": ["darkvision", "fey_ancestry", "skill_versatility"],
+    "Dragonborn": ["draconic_ancestry", "breath_weapon", "damage_resistance"],
+    "Tiefling": ["darkvision", "fire_resistance"],
+    "Half_orc": ["darkvision", "relentless_endurance", "savage_attacks", "menacing"]
+  },
+  "trait_capability_map": {
+    "darkvision": ["darkvision"],
+    "fey ancestry": ["fey_ancestry"],
+    "trance": ["trance"],
+    "keen senses": ["keen_senses"],
+    "brave": ["brave"],
+    "halfling nimbleness": ["halfling_nimbleness"],
+    "lucky": ["lucky"],
+    "dwarven resilience": ["poison_resistance"],
+    "stonecunning": ["stonecunning"],
+    "dwarven combat training": ["dwarven_weapon_training"],
+    "tool proficiency": ["tool_proficiency"],
+    "gnome cunning": ["gnome_cunning"],
+    "skill versatility": ["skill_versatility"],
+    "draconic ancestry": ["draconic_ancestry"],
+    "breath weapon": ["breath_weapon"],
+    "damage resistance": ["damage_resistance"],
+    "hellish resistance": ["fire_resistance"],
+    "infernal legacy": ["infernal_legacy"],
+    "relentless endurance": ["relentless_endurance"],
+    "savage attacks": ["savage_attacks"],
+    "menacing": ["menacing"]
+  },
+  "feature_capability_map": {
+    "slow fall": ["slow_fall"],
+    "unarmored defense": ["unarmored_defense"],
+    "divine sense": ["divine_sense"],
+    "lay on hands": ["lay_on_hands"],
+    "primeval awareness": ["primeval_awareness"],
+    "eldritch invocations": ["eldritch_invocations"],
+    "pact magic": ["pact_magic"]
+  },
+  "level_based_capabilities": [
+    {
+      "species": "Tiefling",
+      "min_level": 1,
+      "capabilities": ["thaumaturgy"]
+    },
+    {
+      "species": "Tiefling",
+      "min_level": 3,
+      "capabilities": ["hellish_rebuke"]
+    },
+    {
+      "species": "Tiefling",
+      "min_level": 5,
+      "capabilities": ["darkness"]
+    },
+    {
+      "class": "monk",
+      "min_level": 4,
+      "capabilities": ["slow_fall"]
+    },
+    {
+      "class": "paladin",
+      "min_level": 1,
+      "capabilities": ["divine_sense", "lay_on_hands"]
+    },
+    {
+      "class": "ranger",
+      "min_level": 3,
+      "capabilities": ["primeval_awareness"]
+    }
+  ],
+  "spell_redundancy_rules": [
+    {
+      "spell": "Darkvision",
+      "blocked_by_any_capabilities": ["darkvision"],
+      "reason": "Character already has Darkvision from species or features."
+    },
+    {
+      "spell": "Thaumaturgy",
+      "blocked_by_any_capabilities": ["thaumaturgy"],
+      "reason": "Tiefling Infernal Legacy already grants Thaumaturgy."
+    },
+    {
+      "spell": "Hellish Rebuke",
+      "blocked_by_any_capabilities": ["hellish_rebuke"],
+      "reason": "Tiefling Infernal Legacy already grants Hellish Rebuke at 3rd level."
+    },
+    {
+      "spell": "Darkness",
+      "blocked_by_any_capabilities": ["darkness"],
+      "reason": "Tiefling Infernal Legacy already grants Darkness at 5th level."
+    }
+  ]
+}

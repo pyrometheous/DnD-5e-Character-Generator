@@ -6,6 +6,7 @@ from tinys_srd import Races as Species
 
 from scripts import character
 from scripts.party_balance import build_balanced_party, format_party_summary
+from scripts.spellbook import build_spellbook_for_character, format_spellbook
 
 
 def parse_requested_values(raw_value, valid_values, label):
@@ -48,9 +49,26 @@ def choose_requested_value(values, index):
     return random.choice(values)
 
 
+def maybe_generate_spellbook(new_character, should_generate):
+    if not should_generate:
+        return None
+
+    spellbook = build_spellbook_for_character(new_character)
+    if spellbook is None:
+        print(
+            f"{new_character.name} the {new_character.char_class.capitalize()} "
+            "does not have a class spellbook to generate."
+        )
+        return None
+
+    print()
+    print(format_spellbook(spellbook))
+    return spellbook
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="D&D 5e Random Character and Party Generator"
+        description="D&D 5e Random Character, Party, and Spellbook Generator"
     )
     parser.add_argument(
         '--level', type=int, default=None,
@@ -87,6 +105,13 @@ def main():
             "config/party_balance_rules.json."
         )
     )
+    parser.add_argument(
+        '--spellbook', action='store_true',
+        help=(
+            "Generate a random class-appropriate spellbook for each "
+            "spellcasting character."
+        )
+    )
     args = parser.parse_args()
 
     valid_species = [s.capitalize() for s in Species.entries]
@@ -111,7 +136,8 @@ def main():
                 print(f"\n--- Character {index} of {args.characters} ---")
             new_character = party_member['character']
             new_character.display_character_sheet()
-            new_character.create_pdf_file(font_name=args.font)
+            spellbook = maybe_generate_spellbook(new_character, args.spellbook)
+            new_character.create_pdf_file(font_name=args.font, spellbook=spellbook)
         return
 
     for index in range(args.characters):
@@ -123,7 +149,8 @@ def main():
             species=choose_requested_value(selected_species, index),
         )
         new_character.display_character_sheet()
-        new_character.create_pdf_file(font_name=args.font)
+        spellbook = maybe_generate_spellbook(new_character, args.spellbook)
+        new_character.create_pdf_file(font_name=args.font, spellbook=spellbook)
 
 
 if __name__ == "__main__":
