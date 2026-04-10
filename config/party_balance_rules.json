@@ -1,0 +1,81 @@
+{
+  "party_size_roles": {
+    "1": ["survivor"],
+    "2": ["healer", "expert"],
+    "3": ["frontline", "healer", "expert"],
+    "4": ["frontline", "healer", "expert", "arcane"],
+    "5": ["frontline", "healer", "expert", "arcane", "support"],
+    "6": ["frontline", "healer", "expert", "arcane", "support", "striker"]
+  },
+  "overflow_role_cycle": ["support", "striker", "frontline"],
+  "role_definitions": {
+    "survivor": {
+      "label": "Flexible survivor",
+      "classes": ["bard", "paladin", "ranger", "druid"]
+    },
+    "frontline": {
+      "label": "Frontline anchor",
+      "classes": ["fighter", "paladin", "barbarian", "monk", "ranger"]
+    },
+    "healer": {
+      "label": "Healer / support",
+      "classes": ["cleric", "druid", "bard", "paladin", "ranger"]
+    },
+    "expert": {
+      "label": "Scout / lockpicker",
+      "classes": ["rogue", "bard", "ranger", "monk"]
+    },
+    "arcane": {
+      "label": "Arcane utility",
+      "classes": ["wizard", "sorcerer", "warlock", "bard", "druid"]
+    },
+    "support": {
+      "label": "Battlefield support",
+      "classes": ["bard", "cleric", "druid", "paladin", "warlock"]
+    },
+    "striker": {
+      "label": "Damage dealer",
+      "classes": ["rogue", "ranger", "barbarian", "sorcerer", "warlock"]
+    }
+  },
+  "capability_requirements": {
+    "must_have": {
+      "healer": ["cleric", "druid", "bard", "paladin", "ranger"],
+      "lockpicker": ["rogue", "bard", "ranger", "monk"]
+    }
+  },
+  "species_preferences": {
+    "survivor": ["Human", "Half_elf", "Elf", "Dwarf"],
+    "frontline": ["Dwarf", "Human", "Half_orc", "Dragonborn"],
+    "healer": ["Human", "Elf", "Dwarf", "Half_elf"],
+    "expert": ["Halfling", "Elf", "Half_elf", "Human"],
+    "arcane": ["Elf", "Human", "Tiefling", "Gnome"],
+    "support": ["Human", "Half_elf", "Elf", "Tiefling"],
+    "striker": ["Half_orc", "Dragonborn", "Human", "Tiefling"]
+  },
+  "default_species_pool": [
+    "Human",
+    "Elf",
+    "Dwarf",
+    "Halfling",
+    "Dragonborn",
+    "Gnome",
+    "Half_elf",
+    "Half_orc",
+    "Tiefling"
+  ],
+  "class_synergy": {
+    "barbarian": ["bard", "cleric", "druid", "rogue"],
+    "bard": ["fighter", "paladin", "rogue", "wizard"],
+    "cleric": ["fighter", "paladin", "rogue", "wizard"],
+    "druid": ["barbarian", "fighter", "ranger", "rogue"],
+    "fighter": ["bard", "cleric", "rogue", "wizard"],
+    "monk": ["cleric", "druid", "rogue", "wizard"],
+    "paladin": ["bard", "cleric", "rogue", "wizard"],
+    "ranger": ["bard", "cleric", "fighter", "wizard"],
+    "rogue": ["bard", "cleric", "fighter", "wizard"],
+    "sorcerer": ["cleric", "fighter", "paladin", "rogue"],
+    "warlock": ["bard", "fighter", "paladin", "rogue"],
+    "wizard": ["bard", "cleric", "fighter", "rogue"]
+  }
+}

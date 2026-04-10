@@ -1,4 +1,4 @@
-import roll
+from scripts import roll
 
 from tinys_srd import Classes, Equipment, Proficiencies, Levels
 from tinys_srd import Races as Species
@@ -85,7 +85,8 @@ AVAILABLE_FONTS = {
     'uncialantiqua': {'css': 'Uncial+Antiqua',               'desc': 'Celtic/uncial manuscript style'},
 }
 
-FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.fonts')
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FONTS_DIR = os.path.join(BASE_DIR, '.fonts')
 
 
 
