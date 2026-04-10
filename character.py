@@ -483,29 +483,38 @@ def apply_custom_font(pdf_path, font_name):
     font_path = download_font(font_name)
     font_obj = fitz.Font(fontfile=font_path)
 
+    # Collect all filled widget data across all pages
     doc = fitz.open(pdf_path)
+    all_page_data = []
     for page in doc:
-        # Collect text widget data, then delete them to remove old rendering
         widgets_data = []
-        widgets_to_delete = []
         for w in page.widgets():
-            if w.field_type == fitz.PDF_WIDGET_TYPE_TEXT:
-                if w.field_value:
-                    widgets_data.append({
-                        'name': w.field_name,
-                        'value': str(w.field_value),
-                        'rect': w.rect,
-                    })
-                widgets_to_delete.append(w)
+            if w.field_type == fitz.PDF_WIDGET_TYPE_TEXT and w.field_value:
+                widgets_data.append({
+                    'name': w.field_name,
+                    'value': str(w.field_value),
+                    'rect': w.rect,
+                })
+        all_page_data.append(widgets_data)
+    doc.close()
 
+    # Process one page at a time, saving and reopening between pages
+    # to avoid cross-page widget corruption
+    for page_num in range(len(all_page_data)):
+        widgets_data = all_page_data[page_num]
         if not widgets_data:
             continue
 
-        # Delete ALL text widgets (removes their appearance streams entirely)
-        for w in widgets_to_delete:
+        doc = fitz.open(pdf_path)
+        page = doc[page_num]
+
+        # Delete filled text widgets on this page only
+        filled = [w for w in page.widgets()
+                  if w.field_type == fitz.PDF_WIDGET_TYPE_TEXT and w.field_value]
+        for w in filled:
             page.delete_widget(w)
 
-        # Draw text at each field's position with the custom font
+        # Render custom font text at each field position
         for wd in widgets_data:
             rect = wd['rect']
             value = wd['value']
@@ -529,15 +538,21 @@ def apply_custom_font(pdf_path, font_name):
             else:
                 fontsize = min(height * 0.75, 11)
 
-            # For multiline fields, use insert_textbox
-            if '\n' in value:
+            # Textbox fields and multiline values use insert_textbox
+            # (positions text at top-left of the rect)
+            if name in TEXTBOX_FIELDS or '\n' in value:
                 if name in TEXTBOX_FIELDS:
                     fontsize = 9
-                page.insert_textbox(
-                    rect, value,
-                    fontname="custom", fontfile=font_path,
-                    fontsize=fontsize, align=fitz.TEXT_ALIGN_LEFT,
-                )
+                # Shrink font until text fits; overflow drops all content
+                while fontsize > 4:
+                    rc = page.insert_textbox(
+                        rect, value,
+                        fontname="custom", fontfile=font_path,
+                        fontsize=fontsize, align=fitz.TEXT_ALIGN_LEFT,
+                    )
+                    if rc >= 0:
+                        break
+                    fontsize -= 0.5
                 continue
 
             # Calculate position for single-line text
@@ -562,10 +577,11 @@ def apply_custom_font(pdf_path, font_name):
                 fontsize=fontsize,
             )
 
-    tmp_path = pdf_path + '.tmp'
-    doc.save(tmp_path, garbage=4, deflate=True)
-    doc.close()
-    os.replace(tmp_path, pdf_path)
+        # Save this page's changes before processing the next page
+        tmp_path = pdf_path + '.tmp'
+        doc.save(tmp_path, deflate=True)
+        doc.close()
+        os.replace(tmp_path, pdf_path)
 
 
 def random_character_class():
