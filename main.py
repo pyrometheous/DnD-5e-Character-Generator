@@ -51,7 +51,7 @@ def choose_requested_value(values, index):
 
 def maybe_generate_spellbook(new_character, should_generate):
     if not should_generate:
-        return
+        return None
 
     spellbook = build_spellbook_for_character(new_character)
     if spellbook is None:
@@ -59,12 +59,13 @@ def maybe_generate_spellbook(new_character, should_generate):
             f"{new_character.name} the {new_character.char_class.capitalize()} "
             "does not have a class spellbook to generate."
         )
-        return
+        return None
 
     print()
     print(format_spellbook(spellbook))
     output_path = save_spellbook_to_file(spellbook)
     print(f"Spellbook saved to: {output_path}")
+    return spellbook
 
 
 def main():
@@ -137,8 +138,8 @@ def main():
                 print(f"\n--- Character {index} of {args.characters} ---")
             new_character = party_member['character']
             new_character.display_character_sheet()
-            maybe_generate_spellbook(new_character, args.spellbook)
-            new_character.create_pdf_file(font_name=args.font)
+            spellbook = maybe_generate_spellbook(new_character, args.spellbook)
+            new_character.create_pdf_file(font_name=args.font, spellbook=spellbook)
         return
 
     for index in range(args.characters):
@@ -150,8 +151,8 @@ def main():
             species=choose_requested_value(selected_species, index),
         )
         new_character.display_character_sheet()
-        maybe_generate_spellbook(new_character, args.spellbook)
-        new_character.create_pdf_file(font_name=args.font)
+        spellbook = maybe_generate_spellbook(new_character, args.spellbook)
+        new_character.create_pdf_file(font_name=args.font, spellbook=spellbook)
 
 
 if __name__ == "__main__":

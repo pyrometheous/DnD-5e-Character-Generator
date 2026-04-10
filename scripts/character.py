@@ -263,7 +263,7 @@ class Character:
         """
         print(character_sheet)
 
-    def create_pdf_file(self, font_name=None):
+    def create_pdf_file(self, font_name=None, spellbook=None):
         input_pdf_filename = "./Character Sheet.pdf"
         output_pdf_filename = f"./{self.name.replace(' ', '_')}_Character_Sheet.pdf"
         urllib.request.urlretrieve(
@@ -402,6 +402,8 @@ class Character:
                     if slots > 0:
                         fields[field_name] = slots
 
+        apply_spellbook_fields(fields, spellbook)
+
         fillpdfs.write_fillable_pdf(input_pdf_filename, output_pdf_filename, fields)
 
         if font_name is None:
@@ -477,6 +479,39 @@ SPELL_SHEET_PREFIXES = (
     'Spellcasting Class 2', 'SpellcastingAbility 2',
     'SpellSaveDC', 'SpellAtkBonus',
 )
+
+SPELLBOOK_FIELD_MAP = {
+    0: [f'Spells 10{i}' for i in range(14, 23)],
+    1: [f'Spells 10{i}' for i in range(23, 34)],
+    2: [f'Spells 10{i}' for i in range(34, 47)],
+    3: [f'Spells 10{i}' for i in range(47, 60)],
+    4: [f'Spells 10{i}' for i in range(60, 73)],
+    5: [f'Spells 10{i}' for i in range(73, 82)],
+    6: [f'Spells 10{i}' for i in range(82, 91)],
+    7: [f'Spells 10{i}' for i in range(91, 100)],
+    8: [f'Spells 10{i}' for i in range(100, 107)],
+    9: [f'Spells 10{i}' for i in range(107, 114)],
+}
+
+
+def apply_spellbook_fields(fields, spellbook):
+    """Populate page 3 spell-name fields without marking spells as prepared."""
+    if not spellbook:
+        return
+
+    for field_name, spell in zip(SPELLBOOK_FIELD_MAP[0], spellbook.get('cantrips', [])):
+        fields[field_name] = spell['name']
+
+    for level, spells in spellbook.get('spells_by_level', {}).items():
+        level = int(level)
+        available_fields = SPELLBOOK_FIELD_MAP.get(level, [])
+        if not available_fields:
+            continue
+
+        # The 1st-level section has a built-in placeholder on its first line.
+        start_index = 1 if level == 1 else 0
+        for field_name, spell in zip(available_fields[start_index:], spells):
+            fields[field_name] = spell['name']
 
 
 def apply_custom_font(pdf_path, font_name):
