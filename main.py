@@ -6,7 +6,7 @@ from tinys_srd import Races as Species
 
 from scripts import character
 from scripts.party_balance import build_balanced_party, format_party_summary
-from scripts.spellbook import build_spellbook_for_character, format_spellbook, save_spellbook_to_file
+from scripts.spellbook import build_spellbook_for_character, format_spellbook
 
 
 def parse_requested_values(raw_value, valid_values, label):
@@ -63,8 +63,6 @@ def maybe_generate_spellbook(new_character, should_generate):
 
     print()
     print(format_spellbook(spellbook))
-    output_path = save_spellbook_to_file(spellbook)
-    print(f"Spellbook saved to: {output_path}")
     return spellbook
 
 

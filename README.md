@@ -87,6 +87,6 @@ Each character produces:
 
 The PDF is based on the official WotC D&D 5E form-fillable character sheet and includes ability scores, saving throws, skills, equipment, proficiencies, languages, features, traits, and spell slots (for caster classes).
 
-If you use `--spellbook`, the generator also writes a plain-text spellbook file with random class-appropriate 5e spells for the generated caster.
+If you use `--spellbook`, the generator also writes a plain-text spellbook file and fills the spell list on page 3 of the PDF with random class-appropriate 5e spells for the generated caster, without marking any spells as prepared.
 
 Balanced party templates and class-role tuning live in `config/party_balance_rules.json`, so you can manually fine-tune what combinations the generator prefers.
