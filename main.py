@@ -30,15 +30,22 @@ def main():
         choices=font_names,
         help="Fantasy font for the PDF. Choices: " + ', '.join(font_names)
     )
+    parser.add_argument(
+        '--characters', type=int, default=1,
+        help="Number of characters to generate (default: 1)."
+    )
     args = parser.parse_args()
 
-    new_character = character.create_random_character(
-        level=args.level,
-        char_class=args.char_class,
-        species=args.species,
-    )
-    new_character.display_character_sheet()
-    new_character.create_pdf_file(font_name=args.font)
+    for i in range(args.characters):
+        if args.characters > 1:
+            print(f"\n--- Character {i + 1} of {args.characters} ---")
+        new_character = character.create_random_character(
+            level=args.level,
+            char_class=args.char_class,
+            species=args.species,
+        )
+        new_character.display_character_sheet()
+        new_character.create_pdf_file(font_name=args.font)
 
 
 if __name__ == "__main__":
