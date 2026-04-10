@@ -470,6 +470,13 @@ TEXTBOX_FIELDS = {
     'Equipment', 'AttacksSpellcasting',
 }
 
+# Spell sheet (page 3) field prefixes — render at nearly full field height
+SPELL_SHEET_PREFIXES = (
+    'Spells 10', 'SlotsTotal', 'SlotsRemaining',
+    'Spellcasting Class 2', 'SpellcastingAbility 2',
+    'SpellSaveDC', 'SpellAtkBonus',
+)
+
 
 def apply_custom_font(pdf_path, font_name):
     """Replace form field text with custom-font rendered text via pymupdf."""
@@ -506,6 +513,7 @@ def apply_custom_font(pdf_path, font_name):
             name = wd['name']
 
             # Scale font size based on field type
+            is_spell_sheet = any(name.startswith(p) for p in SPELL_SHEET_PREFIXES)
             if name in LARGE_FIELDS:
                 fontsize = height * 0.75
             elif name in MEDIUM_FIELDS:
@@ -515,6 +523,9 @@ def apply_custom_font(pdf_path, font_name):
                 fontsize = height * 0.95
             elif name in TEXTBOX_FIELDS:
                 fontsize = 9
+            elif is_spell_sheet:
+                # Spell sheet fields — use nearly full height for readability
+                fontsize = height * 0.95
             else:
                 fontsize = min(height * 0.75, 11)
 
@@ -537,7 +548,8 @@ def apply_custom_font(pdf_path, font_name):
                 fontsize = fontsize * (rect.width - 2) / text_width
                 text_width = font_obj.text_length(value, fontsize=fontsize)
 
-            if name in LARGE_FIELDS or name in MEDIUM_FIELDS or name in SMALL_VALUE_FIELDS:
+            is_spell_numeric = is_spell_sheet and not name.startswith('Spells 10')
+            if name in LARGE_FIELDS or name in MEDIUM_FIELDS or name in SMALL_VALUE_FIELDS or is_spell_numeric:
                 x = rect.x0 + (rect.width - text_width) / 2
             else:
                 x = rect.x0 + 1
