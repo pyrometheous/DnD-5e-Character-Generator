@@ -34,7 +34,7 @@ Running with no arguments generates a single character with a random class, spec
 | `--font` | string | Random | Fantasy font for the PDF. |
 | `--characters` | int | 1 | Number of characters to generate. |
 | `--balance` | flag | Off | Build a theoretically balanced party for the requested group size. |
-| `--spellbook` | flag | Off | Generate a random class-appropriate spellbook for spellcasting classes. |
+| `--spellbook` | flag | Off | Populate page 3 of the PDF with a random, redundancy-aware spellbook for spellcasting classes. |
 
 ### Valid Values
 
@@ -87,6 +87,6 @@ Each character produces:
 
 The PDF is based on the official WotC D&D 5E form-fillable character sheet and includes ability scores, saving throws, skills, equipment, proficiencies, languages, features, traits, and spell slots (for caster classes).
 
-If you use `--spellbook`, the generator also writes a plain-text spellbook file and fills the spell list on page 3 of the PDF with random class-appropriate 5e spells for the generated caster, without marking any spells as prepared.
+If you use `--spellbook`, the generator fills the spell list on page 3 of the PDF with random class-appropriate 5e spells for the generated caster, without marking any spells as prepared. Redundancy filtering and species/class cross-check rules live in `config/spellbook_rules.json`, so you can tune them manually in the future.
 
 Balanced party templates and class-role tuning live in `config/party_balance_rules.json`, so you can manually fine-tune what combinations the generator prefers.

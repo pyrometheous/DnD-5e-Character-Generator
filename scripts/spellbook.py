@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import random
 from pathlib import Path
 
@@ -7,14 +8,79 @@ from tinys_srd import Levels, Spells
 
 from scripts.character import SPELLCASTING_ABILITY, modifier
 
-PREPARED_SPELL_ABILITIES = {
-    "cleric": "wisdom",
-    "druid": "wisdom",
-    "paladin": "charisma",
-    "wizard": "intelligence",
-}
+CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "spellbook_rules.json"
 
-HALF_CASTER_CLASSES = {"paladin", "ranger", "warlock"}
+
+def load_spellbook_config(config_path: str | Path | None = None) -> dict:
+    target_path = Path(config_path) if config_path else CONFIG_PATH
+    with target_path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def _normalize_name(value: str) -> str:
+    return value.strip().lower().replace("_", " ").replace("-", " ")
+
+
+def _lookup_capabilities(name: str, mapping: dict[str, list[str]]) -> set[str]:
+    normalized = _normalize_name(name)
+    capabilities: set[str] = set()
+    for key, values in mapping.items():
+        normalized_key = _normalize_name(key)
+        if normalized == normalized_key or normalized.startswith(f"{normalized_key} ("):
+            capabilities.update(values)
+    return capabilities
+
+
+def _collect_character_capabilities(character_obj, config: dict) -> set[str]:
+    capabilities: set[str] = set()
+    for species_name, species_capabilities in config.get("species_capabilities", {}).items():
+        if _normalize_name(species_name) == _normalize_name(character_obj.species):
+            capabilities.update(species_capabilities)
+
+    for trait in character_obj.get_traits():
+        capabilities.update(
+            _lookup_capabilities(trait, config.get("trait_capability_map", {}))
+        )
+
+    for feature in character_obj.get_features():
+        capabilities.update(
+            _lookup_capabilities(feature, config.get("feature_capability_map", {}))
+        )
+
+    for rule in config.get("level_based_capabilities", []):
+        min_level = int(rule.get("min_level", 1))
+        if character_obj.level < min_level:
+            continue
+        if (
+            rule.get("species")
+            and _normalize_name(rule["species"]) != _normalize_name(character_obj.species)
+        ):
+            continue
+        if (
+            rule.get("class")
+            and _normalize_name(rule["class"]) != _normalize_name(character_obj.char_class)
+        ):
+            continue
+        capabilities.update(rule.get("capabilities", []))
+
+    return capabilities
+
+
+def _spell_is_redundant(spell, character_capabilities: set[str], config: dict) -> bool:
+    normalized_spell = _normalize_name(spell.name)
+    for rule in config.get("spell_redundancy_rules", []):
+        if _normalize_name(rule.get("spell", "")) != normalized_spell:
+            continue
+
+        blocked_by_any = set(rule.get("blocked_by_any_capabilities", []))
+        blocked_by_all = set(rule.get("blocked_by_all_capabilities", []))
+
+        if blocked_by_any and character_capabilities.intersection(blocked_by_any):
+            return True
+        if blocked_by_all and blocked_by_all.issubset(character_capabilities):
+            return True
+
+    return False
 
 
 def _ordinal(level: int) -> str:
@@ -34,7 +100,11 @@ def _spell_to_dict(spell) -> dict:
     }
 
 
-def _get_spell_pool(char_class: str) -> dict[int, list]:
+def _get_spell_pool(
+    char_class: str,
+    character_capabilities: set[str],
+    config: dict,
+) -> dict[int, list]:
     class_name = char_class.lower()
     pool: dict[int, list] = {level: [] for level in range(10)}
 
@@ -44,7 +114,9 @@ def _get_spell_pool(char_class: str) -> dict[int, list]:
             class_info["name"].lower()
             for class_info in getattr(spell, "classes", [])
         }
-        if class_name in spell_classes:
+        if class_name in spell_classes and not _spell_is_redundant(
+            spell, character_capabilities, config
+        ):
             pool.setdefault(int(spell.level), []).append(spell)
 
     for spells in pool.values():
@@ -62,7 +134,11 @@ def _get_spell_slots(spellcasting: dict) -> dict[int, int]:
     return slot_map
 
 
-def _estimate_leveled_spell_count(character_obj, spellcasting: dict) -> int:
+def _estimate_leveled_spell_count(
+    character_obj,
+    spellcasting: dict,
+    config: dict,
+) -> int:
     char_class = character_obj.char_class
 
     if char_class == "wizard":
@@ -71,7 +147,7 @@ def _estimate_leveled_spell_count(character_obj, spellcasting: dict) -> int:
     if spellcasting.get("spells_known"):
         return int(spellcasting["spells_known"])
 
-    ability_name = PREPARED_SPELL_ABILITIES.get(char_class)
+    ability_name = config.get("prepared_spellcasting_abilities", {}).get(char_class)
     if ability_name:
         ability_mod = max(1, modifier(getattr(character_obj, ability_name)))
         if char_class == "paladin":
@@ -87,6 +163,7 @@ def _allocate_spells_by_level(
     spell_slots: dict[int, int],
     spell_pool: dict[int, list],
     char_class: str,
+    config: dict,
 ) -> dict[int, int]:
     available_levels = sorted(spell_slots)
     allocation = {level: 0 for level in available_levels}
@@ -94,7 +171,11 @@ def _allocate_spells_by_level(
     if known_spell_count <= 0 or not available_levels:
         return allocation
 
-    base_spells_per_level = 1 if char_class in HALF_CASTER_CLASSES else 2
+    limited_caster_classes = set(config.get("limited_caster_classes", []))
+    if char_class in limited_caster_classes:
+        base_spells_per_level = int(config.get("limited_caster_base_spells_per_level", 1))
+    else:
+        base_spells_per_level = int(config.get("default_base_spells_per_level", 2))
 
     for level in available_levels:
         if known_spell_count <= 0:
@@ -123,7 +204,11 @@ def _allocate_spells_by_level(
     return allocation
 
 
-def build_spellbook_for_character(character_obj) -> dict | None:
+def build_spellbook_for_character(
+    character_obj,
+    config_path: str | Path | None = None,
+) -> dict | None:
+    config = load_spellbook_config(config_path)
     char_class = character_obj.char_class.lower()
     if char_class not in SPELLCASTING_ABILITY:
         return None
@@ -133,18 +218,22 @@ def build_spellbook_for_character(character_obj) -> dict | None:
     if not spellcasting:
         return None
 
-    spell_pool = _get_spell_pool(char_class)
+    character_capabilities = _collect_character_capabilities(character_obj, config)
+    spell_pool = _get_spell_pool(char_class, character_capabilities, config)
     cantrip_count = int(spellcasting.get("cantrips_known", 0))
     cantrip_pool = spell_pool.get(0, [])
     cantrips = random.sample(cantrip_pool, min(cantrip_count, len(cantrip_pool)))
 
     spell_slots = _get_spell_slots(spellcasting)
-    known_spell_count = _estimate_leveled_spell_count(character_obj, spellcasting)
+    known_spell_count = _estimate_leveled_spell_count(
+        character_obj, spellcasting, config
+    )
     level_allocations = _allocate_spells_by_level(
         known_spell_count=known_spell_count,
         spell_slots=spell_slots,
         spell_pool=spell_pool,
         char_class=char_class,
+        config=config,
     )
 
     spells_by_level = {}
@@ -160,7 +249,11 @@ def build_spellbook_for_character(character_obj) -> dict | None:
         "class": char_class,
         "level": character_obj.level,
         "ability": SPELLCASTING_ABILITY[char_class],
-        "cantrips": [_spell_to_dict(spell) for spell in sorted(cantrips, key=lambda spell: spell.name)],
+        "capabilities": sorted(character_capabilities),
+        "cantrips": [
+            _spell_to_dict(spell)
+            for spell in sorted(cantrips, key=lambda spell: spell.name)
+        ],
         "spells_by_level": {
             level: [_spell_to_dict(spell) for spell in spells]
             for level, spells in sorted(spells_by_level.items())
