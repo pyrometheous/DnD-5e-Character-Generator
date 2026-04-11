@@ -1,4 +1,4 @@
-# D&D 5e Character Generator
+# D&D 5e Character Generator (`DnD-5e-Character-Generator`)
 
 A command-line tool that generates random, rules-legal D&D 5th Edition characters (levels 1–20) and outputs filled PDF character sheets with fantasy fonts.
 
@@ -11,8 +11,8 @@ A command-line tool that generates random, rules-legal D&D 5th Edition character
 ### Installation
 
 ```bash
-git clone https://github.com/pyrometheous/dnd_5e_character_generator.git
-cd dnd_5e_character_generator
+git clone https://github.com/pyrometheous/DnD-5e-Character-Generator.git
+cd DnD-5e-Character-Generator
 pip install -r requirements.txt
 ```
 
