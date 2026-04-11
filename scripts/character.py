@@ -557,105 +557,117 @@ def apply_custom_font(pdf_path, font_name):
     font_path = download_font(font_name)
     font_obj = fitz.Font(fontfile=font_path)
 
-    # Collect all filled widget data across all pages
-    doc = fitz.open(pdf_path)
-    all_page_data = []
-    for page in doc:
-        widgets_data = []
-        for w in page.widgets():
-            if w.field_type == fitz.PDF_WIDGET_TYPE_TEXT and w.field_value:
-                widgets_data.append({
-                    'name': w.field_name,
-                    'value': str(w.field_value),
-                    'rect': w.rect,
-                })
-        all_page_data.append(widgets_data)
-    doc.close()
+    # The official WotC character sheet emits noisy, non-fatal MuPDF
+    # diagnostics ("argument error: not a dict (string)") whenever we
+    # inspect and save the AcroForm widgets. Suppress those library messages
+    # here so the CLI stays clean while we render the custom font overlay.
+    previous_error_state = fitz.TOOLS.mupdf_display_errors(False)
+    previous_warning_state = fitz.TOOLS.mupdf_display_warnings(False)
 
-    # Process one page at a time, saving and reopening between pages
-    # to avoid cross-page widget corruption
-    for page_num in range(len(all_page_data)):
-        widgets_data = all_page_data[page_num]
-        if not widgets_data:
-            continue
-
+    try:
+        # Collect all filled widget data across all pages
         doc = fitz.open(pdf_path)
-        page = doc[page_num]
+        all_page_data = []
+        for page in doc:
+            widgets_data = []
+            for w in page.widgets():
+                if w.field_type == fitz.PDF_WIDGET_TYPE_TEXT and w.field_value:
+                    widgets_data.append({
+                        'name': w.field_name,
+                        'value': str(w.field_value),
+                        'rect': w.rect,
+                    })
+            all_page_data.append(widgets_data)
+        doc.close()
 
-        # Delete filled text widgets on this page only
-        filled = [w for w in page.widgets()
-                  if w.field_type == fitz.PDF_WIDGET_TYPE_TEXT and w.field_value]
-        for w in filled:
-            page.delete_widget(w)
-
-        # Render custom font text at each field position
-        for wd in widgets_data:
-            rect = wd['rect']
-            value = wd['value']
-            height = rect.height
-            name = wd['name']
-
-            # Scale font size based on field type
-            is_spell_sheet = any(name.startswith(p) for p in SPELL_SHEET_PREFIXES)
-            if name in LARGE_FIELDS:
-                fontsize = height * 0.75
-            elif name in MEDIUM_FIELDS:
-                fontsize = height * 0.85
-            elif name in SMALL_VALUE_FIELDS:
-                # Saving throws and skill values - maximize readability
-                fontsize = height * 0.95
-            elif name in TEXTBOX_FIELDS:
-                fontsize = 9
-            elif is_spell_sheet:
-                # Spell sheet fields — use nearly full height for readability
-                fontsize = height * 0.95
-            else:
-                fontsize = min(height * 0.75, 11)
-
-            # Textbox fields and multiline values use insert_textbox
-            # (positions text at top-left of the rect)
-            if name in TEXTBOX_FIELDS or '\n' in value:
-                if name in TEXTBOX_FIELDS:
-                    fontsize = 9
-                # Shrink font until text fits; overflow drops all content
-                while fontsize > 4:
-                    rc = page.insert_textbox(
-                        rect, value,
-                        fontname="custom", fontfile=font_path,
-                        fontsize=fontsize, align=fitz.TEXT_ALIGN_LEFT,
-                    )
-                    if rc >= 0:
-                        break
-                    fontsize -= 0.5
+        # Process one page at a time, saving and reopening between pages
+        # to avoid cross-page widget corruption
+        for page_num in range(len(all_page_data)):
+            widgets_data = all_page_data[page_num]
+            if not widgets_data:
                 continue
 
-            # Calculate position for single-line text
-            text_width = font_obj.text_length(value, fontsize=fontsize)
+            doc = fitz.open(pdf_path)
+            page = doc[page_num]
 
-            # Shrink to fit if text overflows the rect
-            if text_width > rect.width - 2:
-                fontsize = fontsize * (rect.width - 2) / text_width
+            # Delete filled text widgets on this page only
+            filled = [w for w in page.widgets()
+                      if w.field_type == fitz.PDF_WIDGET_TYPE_TEXT and w.field_value]
+            for w in filled:
+                page.delete_widget(w)
+
+            # Render custom font text at each field position
+            for wd in widgets_data:
+                rect = wd['rect']
+                value = wd['value']
+                height = rect.height
+                name = wd['name']
+
+                # Scale font size based on field type
+                is_spell_sheet = any(name.startswith(p) for p in SPELL_SHEET_PREFIXES)
+                if name in LARGE_FIELDS:
+                    fontsize = height * 0.75
+                elif name in MEDIUM_FIELDS:
+                    fontsize = height * 0.85
+                elif name in SMALL_VALUE_FIELDS:
+                    # Saving throws and skill values - maximize readability
+                    fontsize = height * 0.95
+                elif name in TEXTBOX_FIELDS:
+                    fontsize = 9
+                elif is_spell_sheet:
+                    # Spell sheet fields — use nearly full height for readability
+                    fontsize = height * 0.95
+                else:
+                    fontsize = min(height * 0.75, 11)
+
+                # Textbox fields and multiline values use insert_textbox
+                # (positions text at top-left of the rect)
+                if name in TEXTBOX_FIELDS or '\n' in value:
+                    if name in TEXTBOX_FIELDS:
+                        fontsize = 9
+                    # Shrink font until text fits; overflow drops all content
+                    while fontsize > 4:
+                        rc = page.insert_textbox(
+                            rect, value,
+                            fontname="custom", fontfile=font_path,
+                            fontsize=fontsize, align=fitz.TEXT_ALIGN_LEFT,
+                        )
+                        if rc >= 0:
+                            break
+                        fontsize -= 0.5
+                    continue
+
+                # Calculate position for single-line text
                 text_width = font_obj.text_length(value, fontsize=fontsize)
 
-            is_spell_numeric = is_spell_sheet and not name.startswith('Spells 10')
-            if name in LARGE_FIELDS or name in MEDIUM_FIELDS or name in SMALL_VALUE_FIELDS or is_spell_numeric:
-                x = rect.x0 + (rect.width - text_width) / 2
-            else:
-                x = rect.x0 + 1
+                # Shrink to fit if text overflows the rect
+                if text_width > rect.width - 2:
+                    fontsize = fontsize * (rect.width - 2) / text_width
+                    text_width = font_obj.text_length(value, fontsize=fontsize)
 
-            y = rect.y0 + (rect.height + fontsize) / 2 - 1
+                is_spell_numeric = is_spell_sheet and not name.startswith('Spells 10')
+                if name in LARGE_FIELDS or name in MEDIUM_FIELDS or name in SMALL_VALUE_FIELDS or is_spell_numeric:
+                    x = rect.x0 + (rect.width - text_width) / 2
+                else:
+                    x = rect.x0 + 1
 
-            page.insert_text(
-                fitz.Point(x, y), value,
-                fontname="custom", fontfile=font_path,
-                fontsize=fontsize,
-            )
+                y = rect.y0 + (rect.height + fontsize) / 2 - 1
 
-        # Save this page's changes before processing the next page
-        tmp_path = pdf_path + '.tmp'
-        doc.save(tmp_path, deflate=True)
-        doc.close()
-        os.replace(tmp_path, pdf_path)
+                page.insert_text(
+                    fitz.Point(x, y), value,
+                    fontname="custom", fontfile=font_path,
+                    fontsize=fontsize,
+                )
+
+            # Save this page's changes before processing the next page
+            tmp_path = pdf_path + '.tmp'
+            doc.save(tmp_path, deflate=True)
+            doc.close()
+            os.replace(tmp_path, pdf_path)
+    finally:
+        fitz.TOOLS.mupdf_display_errors(previous_error_state)
+        fitz.TOOLS.mupdf_display_warnings(previous_warning_state)
+        fitz.TOOLS.reset_mupdf_warnings()
 
 
 def random_character_class():
