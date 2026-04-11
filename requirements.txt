@@ -2,3 +2,5 @@ fictional_names
 tinys_srd
 requests
 fillpdf
+PyMuPDF
+fillpdf
