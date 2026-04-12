@@ -1,6 +1,14 @@
 # GUI Usage (main.pyw)
 
-The desktop GUI launcher lives at `main.pyw` and provides controls for class/species selection, level/party size input, PDF font selection, party balance, and spellbook generation.
+The desktop GUI launcher lives at `main.pyw` and provides controls for:
+
+- multi-select class preference chips (none selected = random)
+- multi-select species preference chips (none selected = random)
+- level dropdown (`Random`, `1`-`20`) and party size input
+- PDF font selection
+- party balance generation
+- spellbook generation
+- appended spell cards
 
 ## Screenshot
 
@@ -51,4 +59,5 @@ You can also double-click `main.pyw` in Explorer if `.pyw` is associated with Py
 
 - PDFs are written to the project root as `<Name>_Character_Sheet.pdf`.
 - If a selected PDF font cannot be downloaded, the launcher falls back to a default font.
+- The left settings pane is scrollable when window height is constrained; action buttons remain anchored at the bottom.
 - The GUI does not replace CLI usage; `main.py` remains the standalone command-line entrypoint.

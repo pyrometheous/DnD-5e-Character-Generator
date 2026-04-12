@@ -32,8 +32,8 @@ py main.py [OPTIONS]
 ## Common Arguments
 
 - `--level` int (1-20), random if omitted
-- `--class` class name
-- `--species` species name
+- `--class` class name or comma-separated class list
+- `--species` species name or comma-separated species list
 - `--font` fantasy font key
 - `--characters` number of characters
 - `--balance` build theoretically balanced party
