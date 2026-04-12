@@ -1,4 +1,21 @@
 {
+  "_meta": {
+    "version": "1.0",
+    "owner": "DnD Character Generator",
+    "last_updated": "2026-04-11",
+    "purpose": "Defines probabilistic feat selection and feat effect resolution behavior.",
+    "examples": [
+      "Make feats more common: lower selection.asi_base_weight.",
+      "Push class-themed feats: increase selection.class_affinity_multiplier."
+    ],
+    "notes": [
+      "This file is strict JSON. Use _meta fields for documentation instead of // comments.",
+      "selection: global weighting multipliers and limits used by feat-vs-ASI decision logic.",
+      "feats: each feat record supports name, weight, tags, class/species affinity, prerequisites, and grants.",
+      "ability_bonus_options and grants.*choice fields are resolved dynamically when a feat is selected.",
+      "repeatable=true allows selecting the same feat more than once when applicable."
+    ]
+  },
   "selection": {
     "asi_base_weight": 4.5,
     "asi_sub_ten_multiplier": 1.8,

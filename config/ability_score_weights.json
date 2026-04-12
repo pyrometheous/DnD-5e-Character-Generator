@@ -1,4 +1,22 @@
 {
+  "_meta": {
+    "version": "1.0",
+    "owner": "DnD Character Generator",
+    "last_updated": "2026-04-11",
+    "purpose": "Controls ASI investment priorities and aggressive floor behavior for ability scores.",
+    "examples": [
+      "Raise rogue Dexterity bias: increase class_priorities.rogue.primary emphasis via global.class_primary_weight.",
+      "Disable forced ASI floor recovery: set global.force_asi_when_important_below_floor to false."
+    ],
+    "notes": [
+      "This file is strict JSON. Use _meta fields for documentation instead of // comments.",
+      "global: tuning knobs for scoring each ASI candidate ability.",
+      "class_priorities: primary/secondary abilities per class (lowercase class keys).",
+      "species_modifiers: per-species ability weighting adjustments.",
+      "important_floor_trigger/floor_target: when a primary stat drops below trigger, ASIs can be forced until floor_target.",
+      "force_asi_when_important_below_floor: true disables feat picks while important stat recovery is in progress."
+    ]
+  },
   "global": {
     "class_primary_weight": 220,
     "class_secondary_weight": 95,

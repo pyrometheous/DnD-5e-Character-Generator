@@ -1,4 +1,22 @@
 {
+  "_meta": {
+    "version": "1.0",
+    "owner": "DnD Character Generator",
+    "last_updated": "2026-04-11",
+    "purpose": "Defines how balanced parties are assembled by roles, class synergy, and species preferences.",
+    "examples": [
+      "Bias 4-player parties toward more control: change party_size_roles.4 role order.",
+      "Increase ranger representation in scouting parties: add ranger to role_definitions.expert.classes."
+    ],
+    "notes": [
+      "This file is strict JSON. Use _meta fields for documentation instead of // comments.",
+      "party_size_roles: baseline role targets by requested party size.",
+      "role_definitions: classes eligible to satisfy each role.",
+      "capability_requirements.must_have: hard constraints the generated party should satisfy.",
+      "species_preferences/default_species_pool: species weighting and fallback pool.",
+      "class_synergy: preferred companions for each class to improve party composition quality."
+    ]
+  },
   "party_size_roles": {
     "1": ["survivor"],
     "2": ["healer", "expert"],

@@ -1,4 +1,21 @@
 {
+  "_meta": {
+    "version": "1.0",
+    "owner": "DnD Character Generator",
+    "last_updated": "2026-04-11",
+    "purpose": "Controls spellbook generation, preparedness formulas, and redundant spell filtering.",
+    "examples": [
+      "Avoid species-granted spells in generated spellbooks: add spell_redundancy_rules entries.",
+      "Adjust known-spell density for limited casters: tune limited_caster_base_spells_per_level."
+    ],
+    "notes": [
+      "This file is strict JSON. Use _meta fields for documentation instead of // comments.",
+      "prepared_spellcasting_abilities: ability used for prepared-caster math by class.",
+      "species_capabilities/trait_capability_map/feature_capability_map: capability extraction inputs.",
+      "level_based_capabilities: level-gated capabilities granted by species/class milestones.",
+      "spell_redundancy_rules: excludes spells that duplicate existing capabilities."
+    ]
+  },
   "prepared_spellcasting_abilities": {
     "cleric": "wisdom",
     "druid": "wisdom",

@@ -77,40 +77,176 @@ SPELLCASTING_ABILITY = {
     'warlock': 'charisma', 'wizard': 'intelligence',
 }
 
-DEFAULT_SPELLCASTING_NOTES = {
-    'bard': [
-        'Spellcasting: slots refresh on long rest.',
-        'Known-spell caster: choose spells learned on level-up.',
-    ],
-    'cleric': [
-        'Spellcasting: slots refresh on long rest.',
-        'Prepared caster: prepare spells each day from the cleric list.',
-    ],
-    'druid': [
-        'Spellcasting: slots refresh on long rest.',
-        'Prepared caster: prepare spells each day from the druid list.',
-    ],
-    'paladin': [
-        'Spellcasting: slots refresh on long rest.',
-        'Half-caster progression: fewer slots than full casters.',
-    ],
-    'ranger': [
-        'Spellcasting: slots refresh on long rest.',
-        'Half-caster progression: fewer slots than full casters.',
-    ],
-    'sorcerer': [
-        'Spellcasting: slots refresh on long rest.',
-        'Flexible Casting: sorcery points can create or convert spell slots.',
-    ],
-    'warlock': [
-        'Pact Magic: slots refresh on short rest.',
-        'At high levels, warlock uses 5th-level pact slots.',
-        'Mystic Arcanum handles 6th-9th level spells (1/long rest each).',
-    ],
-    'wizard': [
-        'Spellcasting: slots refresh on long rest.',
-        'Arcane Recovery restores some slots on a short rest (once/day).',
-    ],
+DEFAULT_SPELLCASTING_GUIDANCE = {
+    'global_rules': {
+        'include_spell_use_basics': True,
+        'include_species_trait_spellcasting_hint': True,
+    },
+    'class_rules': {
+        'bard': {
+            'prepared_formula': 'none',
+            'resource_refresh': 'long_rest',
+            'show_cantrips_known': True,
+            'show_spells_known': True,
+            'include_prepared_rest_reminder': False,
+            'include_mystic_arcanum': False,
+        },
+        'cleric': {
+            'prepared_formula': 'level_plus_mod',
+            'resource_refresh': 'long_rest',
+            'show_cantrips_known': True,
+            'show_spells_known': False,
+            'include_prepared_rest_reminder': True,
+            'include_mystic_arcanum': False,
+        },
+        'druid': {
+            'prepared_formula': 'level_plus_mod',
+            'resource_refresh': 'long_rest',
+            'show_cantrips_known': True,
+            'show_spells_known': False,
+            'include_prepared_rest_reminder': True,
+            'include_mystic_arcanum': False,
+        },
+        'paladin': {
+            'prepared_formula': 'half_level_plus_mod',
+            'resource_refresh': 'long_rest',
+            'show_cantrips_known': False,
+            'show_spells_known': False,
+            'include_prepared_rest_reminder': False,
+            'include_mystic_arcanum': False,
+        },
+        'ranger': {
+            'prepared_formula': 'none',
+            'resource_refresh': 'long_rest',
+            'show_cantrips_known': False,
+            'show_spells_known': True,
+            'include_prepared_rest_reminder': False,
+            'include_mystic_arcanum': False,
+        },
+        'sorcerer': {
+            'prepared_formula': 'none',
+            'resource_refresh': 'long_rest',
+            'show_cantrips_known': True,
+            'show_spells_known': True,
+            'include_prepared_rest_reminder': False,
+            'include_mystic_arcanum': False,
+        },
+        'warlock': {
+            'prepared_formula': 'none',
+            'resource_refresh': 'warlock',
+            'show_cantrips_known': True,
+            'show_spells_known': True,
+            'include_prepared_rest_reminder': False,
+            'include_mystic_arcanum': True,
+        },
+        'wizard': {
+            'prepared_formula': 'wizard',
+            'resource_refresh': 'long_rest',
+            'show_cantrips_known': True,
+            'show_spells_known': False,
+            'include_prepared_rest_reminder': False,
+            'include_mystic_arcanum': False,
+        },
+    },
+    'class_notes': {
+        'bard': [
+            'Spellcasting: slots refresh on long rest.',
+            'Known-spell caster: choose spells learned on level-up.',
+        ],
+        'cleric': [
+            'Spellcasting: slots refresh on long rest.',
+            'Prepared caster: prepare spells each day from the cleric list.',
+        ],
+        'druid': [
+            'Spellcasting: slots refresh on long rest.',
+            'Prepared caster: prepare spells each day from the druid list.',
+        ],
+        'paladin': [
+            'Spellcasting: slots refresh on long rest.',
+            'Half-caster progression: fewer slots than full casters.',
+        ],
+        'ranger': [
+            'Spellcasting: slots refresh on long rest.',
+            'Half-caster progression: fewer slots than full casters.',
+        ],
+        'sorcerer': [
+            'Spellcasting: slots refresh on long rest.',
+            'Flexible Casting: sorcery points can create or convert spell slots.',
+        ],
+        'warlock': [
+            'Pact Magic: slots refresh on short rest.',
+            'At high levels, warlock uses 5th-level pact slots.',
+            'Mystic Arcanum handles 6th-9th level spells (1/long rest each).',
+        ],
+        'wizard': [
+            'Spellcasting: slots refresh on long rest.',
+            'Arcane Recovery restores some slots on a short rest (once/day).',
+        ],
+    },
+    'feat_note_rules': {
+        'match_mode': 'exact_normalized',
+        'use_contains_fallback': True,
+        'aliases': {
+            'Magic Initiate': [
+                'Magic Initiate (Bard)',
+                'Magic Initiate (Cleric)',
+                'Magic Initiate (Druid)',
+                'Magic Initiate (Sorcerer)',
+                'Magic Initiate (Warlock)',
+                'Magic Initiate (Wizard)',
+            ],
+            'War Caster': ['War-Caster', 'Warcaster'],
+            'Spell Sniper': ['Spell-Sniper'],
+        },
+    },
+    'feat_notes': {
+        'Elemental Adept': [
+            'Elemental Adept: choose and focus on one damage type from your feat.',
+        ],
+        'Magic Initiate': [
+            'Magic Initiate: one 1st-level spell can be cast once per long rest.',
+        ],
+        'Ritual Caster': [
+            'Ritual Caster: ritual spells can be cast without expending slots if prepared in your ritual book.',
+        ],
+        'Spell Sniper': [
+            'Spell Sniper: doubled range for attack-roll spells and more reliable cover targeting.',
+        ],
+        'War Caster': [
+            'War Caster: advantage on concentration checks and can cast in place of opportunity attacks.',
+        ],
+    },
+    'species_notes': {
+        'tiefling': [
+            'Species magic: tieflings may gain innate spells from racial traits.',
+        ],
+    },
+    'templates': {
+        'spell_use_basics_header': 'Spell Use Basics:',
+        'spellcasting_ability_line': 'Spellcasting ability: {ability_name} ({ability_mod:+d}).',
+        'spell_save_dc_line': 'Spell Save DC: {save_dc}.',
+        'spell_attack_bonus_line': 'Spell Attack Bonus: +{attack_bonus}.',
+        'cantrips_known_line': 'Cantrips known: {cantrips_known}.',
+        'spells_known_line': 'Spells known from class: {spells_known}.',
+        'prepared_spells_line_cleric_druid': (
+            'Prepared spells each day: {prepared_count} ({level} + {ability_name_short} mod).'
+        ),
+        'prepared_spells_line_wizard': (
+            'Prepared wizard spells each day: {prepared_count} ({level} + INT mod) from your spellbook.'
+        ),
+        'prepared_spells_line_paladin': (
+            'Prepared paladin spells each day: {prepared_count} (level//2 + CHA mod).'
+        ),
+        'prepared_after_long_rest_line': (
+            'After a long rest, choose prepared spells from your class list.'
+        ),
+        'warlock_slots_refresh_line': 'Pact slots refresh on a short or long rest.',
+        'mystic_arcanum_line': 'Mystic Arcanum gained: {arcanum}.',
+        'long_rest_slots_refresh_line': 'Class spell slots refresh on a long rest.',
+        'species_spellcasting_traits_line': (
+            'Species traits may grant additional spells; see your racial traits section.'
+        ),
+    },
 }
 
 SPELL_SLOT_FIELD_MAP = {
@@ -154,9 +290,28 @@ FONTS_DIR = os.path.join(BASE_DIR, '.fonts')
 
 
 def load_spellcasting_notes(config_path=None):
-    """Load class spellcasting notes from JSON config with safe defaults."""
+    """Load spellcasting guidance (class/feat/species notes) from JSON config.
+
+    Backward compatible with legacy format where the JSON is a plain
+    class->notes mapping.
+    """
     target_path = config_path or os.path.join(BASE_DIR, 'config', 'spellcasting_notes.json')
-    notes = {k: list(v) for k, v in DEFAULT_SPELLCASTING_NOTES.items()}
+    notes = {
+        'global_rules': dict(DEFAULT_SPELLCASTING_GUIDANCE['global_rules']),
+        'class_rules': {k: dict(v) for k, v in DEFAULT_SPELLCASTING_GUIDANCE['class_rules'].items()},
+        'class_notes': {k: list(v) for k, v in DEFAULT_SPELLCASTING_GUIDANCE['class_notes'].items()},
+        'feat_note_rules': {
+            'match_mode': DEFAULT_SPELLCASTING_GUIDANCE['feat_note_rules']['match_mode'],
+            'use_contains_fallback': DEFAULT_SPELLCASTING_GUIDANCE['feat_note_rules']['use_contains_fallback'],
+            'aliases': {
+                k: list(v)
+                for k, v in DEFAULT_SPELLCASTING_GUIDANCE['feat_note_rules']['aliases'].items()
+            },
+        },
+        'feat_notes': {k: list(v) for k, v in DEFAULT_SPELLCASTING_GUIDANCE['feat_notes'].items()},
+        'species_notes': {k: list(v) for k, v in DEFAULT_SPELLCASTING_GUIDANCE['species_notes'].items()},
+        'templates': dict(DEFAULT_SPELLCASTING_GUIDANCE['templates']),
+    }
 
     if not os.path.exists(target_path):
         return notes
@@ -170,17 +325,91 @@ def load_spellcasting_notes(config_path=None):
     if not isinstance(loaded, dict):
         return notes
 
-    for class_name, class_notes in loaded.items():
-        if not isinstance(class_name, str) or not isinstance(class_notes, list):
+    # Legacy format: {"wizard": ["..."]}
+    legacy_mode = all(isinstance(value, list) for value in loaded.values())
+    if legacy_mode:
+        loaded = {'class_notes': loaded}
+
+    global_rule_data = loaded.get('global_rules', {})
+    if isinstance(global_rule_data, dict):
+        for key, value in global_rule_data.items():
+            if key in notes['global_rules'] and isinstance(value, bool):
+                notes['global_rules'][key] = value
+
+    class_rule_data = loaded.get('class_rules', {})
+    if isinstance(class_rule_data, dict):
+        for class_name, class_rules in class_rule_data.items():
+            if not isinstance(class_name, str) or not isinstance(class_rules, dict):
+                continue
+            normalized_class = class_name.strip().lower()
+            base_rules = dict(notes['class_rules'].get(
+                normalized_class,
+                DEFAULT_SPELLCASTING_GUIDANCE['class_rules'].get('wizard', {}),
+            ))
+            for key, value in class_rules.items():
+                if key in (
+                    'prepared_formula',
+                    'resource_refresh',
+                ) and isinstance(value, str):
+                    base_rules[key] = value.strip().lower()
+                elif key in (
+                    'show_cantrips_known',
+                    'show_spells_known',
+                    'include_prepared_rest_reminder',
+                    'include_mystic_arcanum',
+                ) and isinstance(value, bool):
+                    base_rules[key] = value
+            notes['class_rules'][normalized_class] = base_rules
+
+    feat_rule_data = loaded.get('feat_note_rules', {})
+    if isinstance(feat_rule_data, dict):
+        mode = feat_rule_data.get('match_mode')
+        if isinstance(mode, str) and mode.strip().lower() in ('exact_normalized', 'contains_normalized'):
+            notes['feat_note_rules']['match_mode'] = mode.strip().lower()
+
+        contains_fallback = feat_rule_data.get('use_contains_fallback')
+        if isinstance(contains_fallback, bool):
+            notes['feat_note_rules']['use_contains_fallback'] = contains_fallback
+
+        alias_data = feat_rule_data.get('aliases', {})
+        if isinstance(alias_data, dict):
+            cleaned_aliases = {}
+            for feat_name, aliases in alias_data.items():
+                if not isinstance(feat_name, str) or not isinstance(aliases, list):
+                    continue
+                cleaned = [
+                    alias.strip()
+                    for alias in aliases
+                    if isinstance(alias, str) and alias.strip()
+                ]
+                if cleaned:
+                    cleaned_aliases[feat_name.strip()] = cleaned
+            if cleaned_aliases:
+                notes['feat_note_rules']['aliases'].update(cleaned_aliases)
+
+    for section_name in ('class_notes', 'feat_notes', 'species_notes'):
+        section_data = loaded.get(section_name, {})
+        if not isinstance(section_data, dict):
             continue
-        normalized_class = class_name.strip().lower()
-        normalized_notes = [
-            note.strip()
-            for note in class_notes
-            if isinstance(note, str) and note.strip()
-        ]
-        if normalized_notes:
-            notes[normalized_class] = normalized_notes
+        for key, value in section_data.items():
+            if not isinstance(key, str) or not isinstance(value, list):
+                continue
+            cleaned_lines = [
+                line.strip()
+                for line in value
+                if isinstance(line, str) and line.strip()
+            ]
+            if cleaned_lines:
+                normalized_key = key.strip()
+                if section_name in ('class_notes', 'species_notes'):
+                    normalized_key = normalized_key.lower()
+                notes[section_name][normalized_key] = cleaned_lines
+
+    template_data = loaded.get('templates', {})
+    if isinstance(template_data, dict):
+        for key, value in template_data.items():
+            if isinstance(key, str) and isinstance(value, str) and value.strip():
+                notes['templates'][key.strip()] = value.strip()
 
     return notes
 
@@ -257,7 +486,8 @@ def load_asi_weight_config(config_path=None):
     return config
 
 
-SPELLCASTING_NOTES = load_spellcasting_notes()
+SPELLCASTING_GUIDANCE = load_spellcasting_notes()
+SPELLCASTING_NOTES = SPELLCASTING_GUIDANCE['class_notes']
 ASI_WEIGHT_CONFIG = load_asi_weight_config()
 FEAT_CONFIG = load_feat_config()
 
@@ -368,6 +598,183 @@ class Character:
 
     def passive_perception(self):
         return 10 + self.skill_modifier('Perception') + self.passive_perception_bonus
+
+    def _spellcaster_notes(self, prof_bonus):
+        if self.char_class not in SPELLCASTING_ABILITY:
+            return []
+
+        notes = []
+
+        def append_unique(line):
+            if line and line not in notes:
+                notes.append(line)
+
+        templates = SPELLCASTING_GUIDANCE.get('templates', {})
+        global_rules = SPELLCASTING_GUIDANCE.get('global_rules', {})
+        class_rules = SPELLCASTING_GUIDANCE.get('class_rules', {}).get(self.char_class, {})
+        feat_note_rules = SPELLCASTING_GUIDANCE.get('feat_note_rules', {})
+
+        def render(template_key, default, **values):
+            template = templates.get(template_key, default)
+            try:
+                return template.format(**values)
+            except (KeyError, ValueError):
+                return default.format(**values)
+
+        def normalize_feat_name(value):
+            return ''.join(ch.lower() for ch in str(value) if ch.isalnum())
+
+        def feat_note_applies(note_key, selected_names):
+            normalized_selected = [normalize_feat_name(name) for name in selected_names]
+            normalized_note = normalize_feat_name(note_key)
+
+            aliases = feat_note_rules.get('aliases', {}).get(note_key, [])
+            normalized_aliases = [normalize_feat_name(alias) for alias in aliases]
+            candidates = [normalized_note] + [alias for alias in normalized_aliases if alias]
+
+            match_mode = str(feat_note_rules.get('match_mode', 'exact_normalized')).lower()
+            use_contains_fallback = bool(feat_note_rules.get('use_contains_fallback', True))
+
+            def exact_match():
+                return any(candidate and candidate in normalized_selected for candidate in candidates)
+
+            def contains_match():
+                for selected in normalized_selected:
+                    if not selected:
+                        continue
+                    for candidate in candidates:
+                        if candidate and (candidate in selected or selected in candidate):
+                            return True
+                return False
+
+            if match_mode == 'contains_normalized':
+                return contains_match()
+            if exact_match():
+                return True
+            if use_contains_fallback:
+                return contains_match()
+            return False
+
+        ability = SPELLCASTING_ABILITY[self.char_class]
+        ability_mod = modifier(getattr(self, ability))
+        save_dc = 8 + prof_bonus + ability_mod
+        attack_bonus = prof_bonus + ability_mod
+
+        include_basics = bool(global_rules.get('include_spell_use_basics', True))
+        if include_basics:
+            append_unique(render(
+                'spell_use_basics_header',
+                'Spell Use Basics:'
+            ))
+            append_unique(render(
+                'spellcasting_ability_line',
+                'Spellcasting ability: {ability_name} ({ability_mod:+d}).',
+                ability_name=ability.capitalize(),
+                ability_mod=ability_mod,
+            ))
+            append_unique(render(
+                'spell_save_dc_line',
+                'Spell Save DC: {save_dc}.',
+                save_dc=save_dc,
+            ))
+            append_unique(render(
+                'spell_attack_bonus_line',
+                'Spell Attack Bonus: +{attack_bonus}.',
+                attack_bonus=attack_bonus,
+            ))
+
+        level_data = getattr(Levels, f"{self.char_class}_{self.level}")
+        spellcasting = getattr(level_data, 'spellcasting', None) or {}
+        cantrips_known = int(spellcasting.get('cantrips_known', 0) or 0)
+        spells_known = int(spellcasting.get('spells_known', 0) or 0)
+        if class_rules.get('show_cantrips_known', True) and cantrips_known > 0:
+            append_unique(render(
+                'cantrips_known_line',
+                'Cantrips known: {cantrips_known}.',
+                cantrips_known=cantrips_known,
+            ))
+        if class_rules.get('show_spells_known', True) and spells_known > 0:
+            append_unique(render(
+                'spells_known_line',
+                'Spells known from class: {spells_known}.',
+                spells_known=spells_known,
+            ))
+
+        prepared_formula = class_rules.get('prepared_formula', 'none')
+        if prepared_formula == 'level_plus_mod':
+            prepare_count = max(1, self.level + ability_mod)
+            append_unique(render(
+                'prepared_spells_line_cleric_druid',
+                'Prepared spells each day: {prepared_count} ({level} + {ability_name_short} mod).',
+                prepared_count=prepare_count,
+                level=self.level,
+                ability_name_short=ability.capitalize(),
+            ))
+            if class_rules.get('include_prepared_rest_reminder', False):
+                append_unique(render(
+                    'prepared_after_long_rest_line',
+                    'After a long rest, choose prepared spells from your class list.'
+                ))
+        elif prepared_formula == 'wizard':
+            prepare_count = max(1, self.level + ability_mod)
+            append_unique(render(
+                'prepared_spells_line_wizard',
+                'Prepared wizard spells each day: {prepared_count} ({level} + INT mod) from your spellbook.',
+                prepared_count=prepare_count,
+                level=self.level,
+            ))
+        elif prepared_formula == 'half_level_plus_mod':
+            prepare_count = max(1, (self.level // 2) + ability_mod)
+            append_unique(render(
+                'prepared_spells_line_paladin',
+                'Prepared paladin spells each day: {prepared_count} (level//2 + CHA mod).',
+                prepared_count=prepare_count,
+            ))
+
+        resource_refresh = class_rules.get('resource_refresh', 'long_rest')
+        if resource_refresh == 'warlock':
+            append_unique(render(
+                'warlock_slots_refresh_line',
+                'Pact slots refresh on a short or long rest.'
+            ))
+        else:
+            append_unique(render(
+                'long_rest_slots_refresh_line',
+                'Class spell slots refresh on a long rest.'
+            ))
+
+        if class_rules.get('include_mystic_arcanum', False):
+            arcanum = [
+                feature['name'] for feature in level_data.features
+                if 'Mystic Arcanum' in feature.get('name', '')
+            ]
+            if arcanum:
+                append_unique(render(
+                    'mystic_arcanum_line',
+                    'Mystic Arcanum gained: {arcanum}.',
+                    arcanum=', '.join(arcanum),
+                ))
+
+        for line in SPELLCASTING_GUIDANCE.get('class_notes', {}).get(self.char_class, []):
+            append_unique(line)
+
+        for line in SPELLCASTING_GUIDANCE.get('species_notes', {}).get(self.species.lower(), []):
+            append_unique(line)
+
+        selected_feats = self.selected_feat_names()
+        for feat_name, feat_lines in SPELLCASTING_GUIDANCE.get('feat_notes', {}).items():
+            if feat_note_applies(feat_name, selected_feats):
+                for line in feat_lines:
+                    append_unique(line)
+
+        include_species_hint = bool(global_rules.get('include_species_trait_spellcasting_hint', True))
+        if include_species_hint and any('Spellcasting' in trait for trait in self.get_traits()):
+            append_unique(render(
+                'species_spellcasting_traits_line',
+                'Species traits may grant additional spells; see your racial traits section.'
+            ))
+
+        return notes
 
     def get_traits(self):
         species_key = self.species.lower()
@@ -915,9 +1322,9 @@ class Character:
         features = self.get_features_annotated()
         fields['Features and Traits'] = '\n'.join(features)
         trait_lines = list(traits)
-        class_notes = SPELLCASTING_NOTES.get(self.char_class, [])
-        if class_notes:
-            trait_lines.extend([''] + class_notes)
+        spellcaster_notes = self._spellcaster_notes(prof_bonus)
+        if spellcaster_notes:
+            trait_lines.extend([''] + spellcaster_notes)
         fields['Feat+Traits'] = '\n'.join(trait_lines)
 
         # Weapon attacks (populate first weapon slot from equipment if applicable)
