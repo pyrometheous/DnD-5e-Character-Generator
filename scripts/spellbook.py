@@ -134,28 +134,43 @@ def _get_spell_slots(spellcasting: dict) -> dict[int, int]:
     return slot_map
 
 
+def _get_castable_levels(spell_slots: dict[int, int], spell_pool: dict[int, list]) -> list[int]:
+    if not spell_slots:
+        return []
+
+    highest_spell_level = max(spell_slots)
+    return [
+        level
+        for level in range(1, highest_spell_level + 1)
+        if spell_pool.get(level)
+    ]
+
+
 def _estimate_leveled_spell_count(
     character_obj,
     spellcasting: dict,
     config: dict,
 ) -> int:
     char_class = character_obj.char_class
+    spell_slots = _get_spell_slots(spellcasting)
+    slot_total = sum(spell_slots.values())
 
     if char_class == "wizard":
-        return 6 + max(0, (character_obj.level - 1) * 2)
+        return max(slot_total, 6 + max(0, (character_obj.level - 1) * 2))
 
     if spellcasting.get("spells_known"):
-        return int(spellcasting["spells_known"])
+        return max(slot_total, int(spellcasting["spells_known"]))
 
     ability_name = config.get("prepared_spellcasting_abilities", {}).get(char_class)
     if ability_name:
         ability_mod = max(1, modifier(getattr(character_obj, ability_name)))
         if char_class == "paladin":
-            return max(1, (character_obj.level // 2) + ability_mod)
-        return max(1, character_obj.level + ability_mod)
+            prepared_spells = max(1, (character_obj.level // 2) + ability_mod)
+        else:
+            prepared_spells = max(1, character_obj.level + ability_mod)
+        return max(slot_total, prepared_spells)
 
-    spell_slots = _get_spell_slots(spellcasting)
-    return max(1, sum(spell_slots.values())) if spell_slots else 0
+    return max(1, slot_total) if spell_slots else 0
 
 
 def _allocate_spells_by_level(
@@ -165,27 +180,39 @@ def _allocate_spells_by_level(
     char_class: str,
     config: dict,
 ) -> dict[int, int]:
-    available_levels = sorted(spell_slots)
+    available_levels = _get_castable_levels(spell_slots, spell_pool)
     allocation = {level: 0 for level in available_levels}
 
     if known_spell_count <= 0 or not available_levels:
         return allocation
 
-    limited_caster_classes = set(config.get("limited_caster_classes", []))
-    if char_class in limited_caster_classes:
-        base_spells_per_level = int(config.get("limited_caster_base_spells_per_level", 1))
-    else:
-        base_spells_per_level = int(config.get("default_base_spells_per_level", 2))
+    slot_targets = {
+        level: max(1, int(spell_slots.get(level, 0)))
+        for level in available_levels
+    }
 
     for level in available_levels:
         if known_spell_count <= 0:
             break
-        picks = min(base_spells_per_level, len(spell_pool.get(level, [])), known_spell_count)
-        allocation[level] += picks
-        known_spell_count -= picks
+        if not spell_pool.get(level):
+            continue
+        allocation[level] += 1
+        known_spell_count -= 1
+
+    for level in available_levels:
+        if known_spell_count <= 0:
+            break
+        max_spells_at_level = len(spell_pool.get(level, []))
+        desired_count = min(slot_targets[level], max_spells_at_level)
+        if allocation[level] >= desired_count:
+            continue
+
+        additional_spells = min(desired_count - allocation[level], known_spell_count)
+        allocation[level] += additional_spells
+        known_spell_count -= additional_spells
 
     weighted_levels = [
-        level for level in available_levels for _ in range(max(1, spell_slots[level]))
+        level for level in available_levels for _ in range(max(1, slot_targets[level]))
     ]
     stalled_attempts = 0
 
