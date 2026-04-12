@@ -53,6 +53,14 @@ Controls spellcaster guidance text rendered into page 2.
 - `feat_note_rules`: feat matching mode and aliases
 - `templates`: dynamic text templates with placeholders
 
+### progression_rules.json
+Controls the end-to-end level-up pipeline and weighted class feature choices.
+- `subclass_selection`: weighted subclass picks by class
+- `feature_selection`: weighted option picks and mechanical grants for exposed class features
+- `subclass_fallbacks`: config-driven subclass feature hooks when tinys_srd lacks inline milestone data
+- `spellcasting.slot_fallbacks`: PHB slot tables by class/level used when tinys_srd slot data is missing or incomplete
+- `spellcasting.class_strategies`: heuristics for learned spells, replacements, preparation, and loadout balance
+
 ### spellbook_rules.json
 Controls spellbook generation and capability-based redundancy filtering.
 - `prepared_spellcasting_abilities`

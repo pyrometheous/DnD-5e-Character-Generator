@@ -7,6 +7,7 @@ from pathlib import Path
 from tinys_srd import Levels, Spells
 
 from scripts.character import SPELLCASTING_ABILITY, modifier
+from scripts.progression import ensure_progression, export_spellbook
 
 CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "spellbook_rules.json"
 
@@ -235,58 +236,12 @@ def build_spellbook_for_character(
     character_obj,
     config_path: str | Path | None = None,
 ) -> dict | None:
-    config = load_spellbook_config(config_path)
     char_class = character_obj.char_class.lower()
     if char_class not in SPELLCASTING_ABILITY:
         return None
 
-    level_data = getattr(Levels, f"{char_class}_{character_obj.level}")
-    spellcasting = getattr(level_data, "spellcasting", None)
-    if not spellcasting:
-        return None
-
-    character_capabilities = _collect_character_capabilities(character_obj, config)
-    spell_pool = _get_spell_pool(char_class, character_capabilities, config)
-    cantrip_count = int(spellcasting.get("cantrips_known", 0))
-    cantrip_pool = spell_pool.get(0, [])
-    cantrips = random.sample(cantrip_pool, min(cantrip_count, len(cantrip_pool)))
-
-    spell_slots = _get_spell_slots(spellcasting)
-    known_spell_count = _estimate_leveled_spell_count(
-        character_obj, spellcasting, config
-    )
-    level_allocations = _allocate_spells_by_level(
-        known_spell_count=known_spell_count,
-        spell_slots=spell_slots,
-        spell_pool=spell_pool,
-        char_class=char_class,
-        config=config,
-    )
-
-    spells_by_level = {}
-    for level, spell_count in level_allocations.items():
-        picked_spells = random.sample(
-            spell_pool.get(level, []),
-            min(spell_count, len(spell_pool.get(level, []))),
-        )
-        spells_by_level[level] = sorted(picked_spells, key=lambda spell: spell.name)
-
-    return {
-        "name": character_obj.name,
-        "class": char_class,
-        "level": character_obj.level,
-        "ability": SPELLCASTING_ABILITY[char_class],
-        "capabilities": sorted(character_capabilities),
-        "cantrips": [
-            _spell_to_dict(spell)
-            for spell in sorted(cantrips, key=lambda spell: spell.name)
-        ],
-        "spells_by_level": {
-            level: [_spell_to_dict(spell) for spell in spells]
-            for level, spells in sorted(spells_by_level.items())
-        },
-        "spell_slots": spell_slots,
-    }
+    ensure_progression(character_obj, spellbook_config=load_spellbook_config(config_path))
+    return export_spellbook(character_obj)
 
 
 def format_spellbook(spellbook: dict) -> str:
@@ -296,9 +251,18 @@ def format_spellbook(spellbook: dict) -> str:
         f"Spellcasting Ability: {spellbook['ability'].capitalize()}",
     ]
 
+    if spellbook.get('subclass'):
+        lines.append(f"Subclass: {spellbook['subclass']}")
+
     if spellbook["cantrips"]:
         lines.append(f"\nCantrips ({len(spellbook['cantrips'])}):")
         for spell in spellbook["cantrips"]:
+            lines.append(f"  - {spell['name']} ({spell['school']})")
+
+    always_prepared = spellbook.get('always_prepared', [])
+    if always_prepared:
+        lines.append(f"\nAlways prepared / bonus spells ({len(always_prepared)}):")
+        for spell in always_prepared:
             lines.append(f"  - {spell['name']} ({spell['school']})")
 
     for level, spells in spellbook["spells_by_level"].items():
@@ -308,6 +272,28 @@ def format_spellbook(spellbook: dict) -> str:
         )
         for spell in spells:
             lines.append(f"  - {spell['name']} ({spell['school']})")
+
+    prepared_spells = spellbook.get('prepared_spells', {})
+    if prepared_spells:
+        lines.append("\nPrepared loadout:")
+        for level, spells in prepared_spells.items():
+            lines.append(f"  {_ordinal(level)} level:")
+            for spell in spells:
+                lines.append(f"    - {spell['name']} ({spell['school']})")
+
+    mystic_arcanum = spellbook.get('mystic_arcanum', {})
+    if mystic_arcanum:
+        lines.append("\nMystic Arcanum:")
+        for level, spell in mystic_arcanum.items():
+            lines.append(f"  - {level}th: {spell['name']} ({spell['school']})")
+
+    replacement_log = spellbook.get('replacement_log', [])
+    if replacement_log:
+        lines.append("\nSpell replacements:")
+        for entry in replacement_log:
+            lines.append(
+                f"  - Level {entry['level']}: {entry['replaced']} -> {entry['new_spell']}"
+            )
 
     return "\n".join(lines)
 
