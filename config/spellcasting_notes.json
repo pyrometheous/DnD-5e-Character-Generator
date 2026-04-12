@@ -13,6 +13,7 @@
       "global_rules: master toggles for baseline guidance blocks.",
       "class_rules: class-specific logic controlling formula and line inclusion.",
       "class_notes/feat_notes/species_notes: custom narrative guidance lines.",
+      "sorcerer_flexible_casting: PHB-backed fallback data for Font of Magic/Flexible Casting details if upstream class_specific data is incomplete.",
       "feat_note_rules: canonical feat-name matching, aliases, and fallback behavior.",
       "templates: text templates with placeholders like {save_dc}, {attack_bonus}, {prepared_count}."
     ]
@@ -110,7 +111,7 @@
     ],
     "sorcerer": [
       "Spellcasting: slots refresh on long rest.",
-      "Flexible Casting: sorcery points can create or convert spell slots."
+      "Flexible Casting details are listed below based on current level resources."
     ],
     "warlock": [
       "Pact Magic: slots refresh on short rest.",
@@ -165,6 +166,55 @@
       "Species magic: tieflings may gain innate spells from racial traits."
     ]
   },
+  "sorcerer_flexible_casting": {
+    "font_of_magic_unlock_level": 2,
+    "max_created_slot_level": 5,
+    "slot_to_point_conversion": "slot_level",
+    "fallback_creation_costs": [
+      {
+        "spell_slot_level": 1,
+        "sorcery_point_cost": 2
+      },
+      {
+        "spell_slot_level": 2,
+        "sorcery_point_cost": 3
+      },
+      {
+        "spell_slot_level": 3,
+        "sorcery_point_cost": 5
+      },
+      {
+        "spell_slot_level": 4,
+        "sorcery_point_cost": 6
+      },
+      {
+        "spell_slot_level": 5,
+        "sorcery_point_cost": 7
+      }
+    ],
+    "fallback_sorcery_points_by_level": {
+      "1": 0,
+      "2": 2,
+      "3": 3,
+      "4": 4,
+      "5": 5,
+      "6": 6,
+      "7": 7,
+      "8": 8,
+      "9": 9,
+      "10": 10,
+      "11": 11,
+      "12": 12,
+      "13": 13,
+      "14": 14,
+      "15": 15,
+      "16": 16,
+      "17": 17,
+      "18": 18,
+      "19": 19,
+      "20": 20
+    }
+  },
   "templates": {
     "spell_use_basics_header": "Spell Use Basics:",
     "spellcasting_ability_line": "Spellcasting ability: {ability_name} ({ability_mod:+d}).",
@@ -179,6 +229,12 @@
     "warlock_slots_refresh_line": "Pact slots refresh on a short or long rest.",
     "mystic_arcanum_line": "Mystic Arcanum gained: {arcanum}.",
     "long_rest_slots_refresh_line": "Class spell slots refresh on a long rest.",
-    "species_spellcasting_traits_line": "Species traits may grant additional spells; see your racial traits section."
+    "species_spellcasting_traits_line": "Species traits may grant additional spells; see your racial traits section.",
+    "sorcery_points_unlock_line": "Font of Magic unlocks at level {unlock_level}; no sorcery points yet.",
+    "sorcery_points_available_line": "Sorcery Points: {sorcery_points} available (max {sorcery_points_max}); regain all on a long rest.",
+    "sorcery_points_to_slots_line": "Flexible Casting (sorcery points -> spell slot): {creation_costs}. Cannot create slots above {max_slot_level}th level.",
+    "sorcery_points_affordable_slots_line": "Current point budget can create: {affordable_costs}.",
+    "sorcery_points_no_affordable_slot_line": "Current point budget cannot create a spell slot yet.",
+    "slot_to_sorcery_points_line": "Flexible Casting (spell slot -> sorcery points): expend one slot to gain points equal to slot level; available slot levels now: {slot_levels}."
   }
 }

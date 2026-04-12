@@ -172,7 +172,7 @@ DEFAULT_SPELLCASTING_GUIDANCE = {
         ],
         'sorcerer': [
             'Spellcasting: slots refresh on long rest.',
-            'Flexible Casting: sorcery points can create or convert spell slots.',
+            'Flexible Casting details are listed below based on current level resources.',
         ],
         'warlock': [
             'Pact Magic: slots refresh on short rest.',
@@ -222,6 +222,24 @@ DEFAULT_SPELLCASTING_GUIDANCE = {
             'Species magic: tieflings may gain innate spells from racial traits.',
         ],
     },
+    'sorcerer_flexible_casting': {
+        'font_of_magic_unlock_level': 2,
+        'max_created_slot_level': 5,
+        'slot_to_point_conversion': 'slot_level',
+        'fallback_creation_costs': [
+            {'spell_slot_level': 1, 'sorcery_point_cost': 2},
+            {'spell_slot_level': 2, 'sorcery_point_cost': 3},
+            {'spell_slot_level': 3, 'sorcery_point_cost': 5},
+            {'spell_slot_level': 4, 'sorcery_point_cost': 6},
+            {'spell_slot_level': 5, 'sorcery_point_cost': 7},
+        ],
+        'fallback_sorcery_points_by_level': {
+            '1': 0, '2': 2, '3': 3, '4': 4, '5': 5,
+            '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
+            '11': 11, '12': 12, '13': 13, '14': 14, '15': 15,
+            '16': 16, '17': 17, '18': 18, '19': 19, '20': 20,
+        },
+    },
     'templates': {
         'spell_use_basics_header': 'Spell Use Basics:',
         'spellcasting_ability_line': 'Spellcasting ability: {ability_name} ({ability_mod:+d}).',
@@ -246,6 +264,24 @@ DEFAULT_SPELLCASTING_GUIDANCE = {
         'long_rest_slots_refresh_line': 'Class spell slots refresh on a long rest.',
         'species_spellcasting_traits_line': (
             'Species traits may grant additional spells; see your racial traits section.'
+        ),
+        'sorcery_points_unlock_line': (
+            'Font of Magic unlocks at level {unlock_level}; no sorcery points yet.'
+        ),
+        'sorcery_points_available_line': (
+            'Sorcery Points: {sorcery_points} available (max {sorcery_points_max}); regain all on a long rest.'
+        ),
+        'sorcery_points_to_slots_line': (
+            'Flexible Casting (sorcery points -> spell slot): {creation_costs}. Cannot create slots above {max_slot_level}th level.'
+        ),
+        'sorcery_points_affordable_slots_line': (
+            'Current point budget can create: {affordable_costs}.'
+        ),
+        'sorcery_points_no_affordable_slot_line': (
+            'Current point budget cannot create a spell slot yet.'
+        ),
+        'slot_to_sorcery_points_line': (
+            'Flexible Casting (spell slot -> sorcery points): expend one slot to gain points equal to slot level; available slot levels now: {slot_levels}.'
         ),
     },
 }
@@ -312,6 +348,30 @@ def load_spellcasting_notes(config_path=None):
         },
         'feat_notes': {k: list(v) for k, v in DEFAULT_SPELLCASTING_GUIDANCE['feat_notes'].items()},
         'species_notes': {k: list(v) for k, v in DEFAULT_SPELLCASTING_GUIDANCE['species_notes'].items()},
+        'sorcerer_flexible_casting': {
+            'font_of_magic_unlock_level': int(
+                DEFAULT_SPELLCASTING_GUIDANCE['sorcerer_flexible_casting']['font_of_magic_unlock_level']
+            ),
+            'max_created_slot_level': int(
+                DEFAULT_SPELLCASTING_GUIDANCE['sorcerer_flexible_casting']['max_created_slot_level']
+            ),
+            'slot_to_point_conversion': str(
+                DEFAULT_SPELLCASTING_GUIDANCE['sorcerer_flexible_casting']['slot_to_point_conversion']
+            ),
+            'fallback_creation_costs': [
+                {
+                    'spell_slot_level': int(entry['spell_slot_level']),
+                    'sorcery_point_cost': int(entry['sorcery_point_cost']),
+                }
+                for entry in DEFAULT_SPELLCASTING_GUIDANCE['sorcerer_flexible_casting']['fallback_creation_costs']
+            ],
+            'fallback_sorcery_points_by_level': {
+                str(level): int(value)
+                for level, value in (
+                    DEFAULT_SPELLCASTING_GUIDANCE['sorcerer_flexible_casting']['fallback_sorcery_points_by_level'].items()
+                )
+            },
+        },
         'templates': dict(DEFAULT_SPELLCASTING_GUIDANCE['templates']),
     }
 
@@ -406,6 +466,57 @@ def load_spellcasting_notes(config_path=None):
                 if section_name in ('class_notes', 'species_notes'):
                     normalized_key = normalized_key.lower()
                 notes[section_name][normalized_key] = cleaned_lines
+
+    sorcerer_data = loaded.get('sorcerer_flexible_casting', {})
+    if isinstance(sorcerer_data, dict):
+        unlock_level = sorcerer_data.get('font_of_magic_unlock_level')
+        if isinstance(unlock_level, (int, float)) and int(unlock_level) >= 1:
+            notes['sorcerer_flexible_casting']['font_of_magic_unlock_level'] = int(unlock_level)
+
+        max_created_slot_level = sorcerer_data.get('max_created_slot_level')
+        if isinstance(max_created_slot_level, (int, float)) and int(max_created_slot_level) >= 1:
+            notes['sorcerer_flexible_casting']['max_created_slot_level'] = int(max_created_slot_level)
+
+        slot_to_point_conversion = sorcerer_data.get('slot_to_point_conversion')
+        if isinstance(slot_to_point_conversion, str) and slot_to_point_conversion.strip():
+            notes['sorcerer_flexible_casting']['slot_to_point_conversion'] = slot_to_point_conversion.strip()
+
+        fallback_creation_costs = sorcerer_data.get('fallback_creation_costs')
+        if isinstance(fallback_creation_costs, list):
+            cleaned_creation_costs = []
+            for entry in fallback_creation_costs:
+                if not isinstance(entry, dict):
+                    continue
+                slot_level = entry.get('spell_slot_level')
+                point_cost = entry.get('sorcery_point_cost')
+                if not isinstance(slot_level, (int, float)) or not isinstance(point_cost, (int, float)):
+                    continue
+                slot_level = int(slot_level)
+                point_cost = int(point_cost)
+                if slot_level < 1 or point_cost < 1:
+                    continue
+                cleaned_creation_costs.append({
+                    'spell_slot_level': slot_level,
+                    'sorcery_point_cost': point_cost,
+                })
+            if cleaned_creation_costs:
+                notes['sorcerer_flexible_casting']['fallback_creation_costs'] = cleaned_creation_costs
+
+        fallback_points = sorcerer_data.get('fallback_sorcery_points_by_level')
+        if isinstance(fallback_points, dict):
+            cleaned_points = {}
+            for level_key, points in fallback_points.items():
+                if not isinstance(points, (int, float)):
+                    continue
+                try:
+                    normalized_level = int(str(level_key).strip())
+                except ValueError:
+                    continue
+                if normalized_level < 1:
+                    continue
+                cleaned_points[str(normalized_level)] = int(points)
+            if cleaned_points:
+                notes['sorcerer_flexible_casting']['fallback_sorcery_points_by_level'] = cleaned_points
 
     template_data = loaded.get('templates', {})
     if isinstance(template_data, dict):
@@ -779,6 +890,106 @@ class Character:
                 'Spells known from class: {spells_known}.',
                 spells_known=spells_known,
             ))
+
+        if self.char_class == 'sorcerer':
+            sorcerer_rules = SPELLCASTING_GUIDANCE.get('sorcerer_flexible_casting', {})
+            unlock_level = int(sorcerer_rules.get('font_of_magic_unlock_level', 2) or 2)
+            max_created_slot_level = int(sorcerer_rules.get('max_created_slot_level', 5) or 5)
+
+            class_specific = getattr(level_data, 'class_specific', None) or {}
+
+            fallback_points = sorcerer_rules.get('fallback_sorcery_points_by_level', {})
+            fallback_points_by_level = {
+                str(level): int(points)
+                for level, points in fallback_points.items()
+                if isinstance(level, str) and isinstance(points, (int, float))
+            }
+
+            sorcery_points_max = int(class_specific.get('sorcery_points', 0) or 0)
+            if sorcery_points_max <= 0:
+                sorcery_points_max = int(
+                    fallback_points_by_level.get(str(self.level), max(0, self.level if self.level >= unlock_level else 0))
+                )
+
+            if self.level < unlock_level:
+                append_unique(render(
+                    'sorcery_points_unlock_line',
+                    'Font of Magic unlocks at level {unlock_level}; no sorcery points yet.',
+                    unlock_level=unlock_level,
+                ))
+            else:
+                append_unique(render(
+                    'sorcery_points_available_line',
+                    'Sorcery Points: {sorcery_points} available (max {sorcery_points_max}); regain all on a long rest.',
+                    sorcery_points=sorcery_points_max,
+                    sorcery_points_max=sorcery_points_max,
+                ))
+
+                creation_options = class_specific.get('creating_spell_slots', [])
+                if not isinstance(creation_options, list) or not creation_options:
+                    creation_options = sorcerer_rules.get('fallback_creation_costs', [])
+
+                cleaned_creation_options = []
+                for entry in creation_options:
+                    if not isinstance(entry, dict):
+                        continue
+                    slot_level = entry.get('spell_slot_level')
+                    point_cost = entry.get('sorcery_point_cost')
+                    if not isinstance(slot_level, (int, float)) or not isinstance(point_cost, (int, float)):
+                        continue
+                    slot_level = int(slot_level)
+                    point_cost = int(point_cost)
+                    if slot_level < 1 or point_cost < 1 or slot_level > max_created_slot_level:
+                        continue
+                    cleaned_creation_options.append((slot_level, point_cost))
+
+                cleaned_creation_options.sort(key=lambda pair: pair[0])
+                if cleaned_creation_options:
+                    creation_costs = ', '.join(
+                        f"{_ordinal(slot_level)} ({point_cost} SP)"
+                        for slot_level, point_cost in cleaned_creation_options
+                    )
+                    append_unique(render(
+                        'sorcery_points_to_slots_line',
+                        'Flexible Casting (sorcery points -> spell slot): {creation_costs}. Cannot create slots above {max_slot_level}th level.',
+                        creation_costs=creation_costs,
+                        max_slot_level=max_created_slot_level,
+                    ))
+
+                    affordable_options = [
+                        (slot_level, point_cost)
+                        for slot_level, point_cost in cleaned_creation_options
+                        if point_cost <= sorcery_points_max
+                    ]
+                    if affordable_options:
+                        affordable_costs = ', '.join(
+                            f"{_ordinal(slot_level)} ({point_cost} SP)"
+                            for slot_level, point_cost in affordable_options
+                        )
+                        append_unique(render(
+                            'sorcery_points_affordable_slots_line',
+                            'Current point budget can create: {affordable_costs}.',
+                            affordable_costs=affordable_costs,
+                        ))
+                    else:
+                        append_unique(render(
+                            'sorcery_points_no_affordable_slot_line',
+                            'Current point budget cannot create a spell slot yet.',
+                        ))
+
+                slot_levels = []
+                for slot_level in range(1, 10):
+                    slot_count = int(spellcasting.get(f'spell_slots_level_{slot_level}', 0) or 0)
+                    if slot_count <= 0:
+                        continue
+                    slot_levels.append(f"{_ordinal(slot_level)} x{slot_count}")
+
+                if slot_levels:
+                    append_unique(render(
+                        'slot_to_sorcery_points_line',
+                        'Flexible Casting (spell slot -> sorcery points): expend one slot to gain points equal to slot level; available slot levels now: {slot_levels}.',
+                        slot_levels=', '.join(slot_levels),
+                    ))
 
         prepared_formula = class_rules.get('prepared_formula', 'none')
         if prepared_formula == 'level_plus_mod':
