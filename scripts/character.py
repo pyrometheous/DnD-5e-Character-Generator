@@ -1,8 +1,10 @@
 from scripts import roll
+from scripts.feats import choose_feat_for_character, load_feat_config
 
 from tinys_srd import Classes, Equipment, Proficiencies, Levels
 from tinys_srd import Races as Species
 
+import json
 import random
 import re
 import io
@@ -75,6 +77,42 @@ SPELLCASTING_ABILITY = {
     'warlock': 'charisma', 'wizard': 'intelligence',
 }
 
+DEFAULT_SPELLCASTING_NOTES = {
+    'bard': [
+        'Spellcasting: slots refresh on long rest.',
+        'Known-spell caster: choose spells learned on level-up.',
+    ],
+    'cleric': [
+        'Spellcasting: slots refresh on long rest.',
+        'Prepared caster: prepare spells each day from the cleric list.',
+    ],
+    'druid': [
+        'Spellcasting: slots refresh on long rest.',
+        'Prepared caster: prepare spells each day from the druid list.',
+    ],
+    'paladin': [
+        'Spellcasting: slots refresh on long rest.',
+        'Half-caster progression: fewer slots than full casters.',
+    ],
+    'ranger': [
+        'Spellcasting: slots refresh on long rest.',
+        'Half-caster progression: fewer slots than full casters.',
+    ],
+    'sorcerer': [
+        'Spellcasting: slots refresh on long rest.',
+        'Flexible Casting: sorcery points can create or convert spell slots.',
+    ],
+    'warlock': [
+        'Pact Magic: slots refresh on short rest.',
+        'At high levels, warlock uses 5th-level pact slots.',
+        'Mystic Arcanum handles 6th-9th level spells (1/long rest each).',
+    ],
+    'wizard': [
+        'Spellcasting: slots refresh on long rest.',
+        'Arcane Recovery restores some slots on a short rest (once/day).',
+    ],
+}
+
 SPELL_SLOT_FIELD_MAP = {
     1: 'SlotsTotal 19',
     2: 'SlotsTotal 20',
@@ -110,6 +148,42 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONTS_DIR = os.path.join(BASE_DIR, '.fonts')
 
 
+def load_spellcasting_notes(config_path=None):
+    """Load class spellcasting notes from JSON config with safe defaults."""
+    target_path = config_path or os.path.join(BASE_DIR, 'config', 'spellcasting_notes.json')
+    notes = {k: list(v) for k, v in DEFAULT_SPELLCASTING_NOTES.items()}
+
+    if not os.path.exists(target_path):
+        return notes
+
+    try:
+        with open(target_path, 'r', encoding='utf-8') as handle:
+            loaded = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return notes
+
+    if not isinstance(loaded, dict):
+        return notes
+
+    for class_name, class_notes in loaded.items():
+        if not isinstance(class_name, str) or not isinstance(class_notes, list):
+            continue
+        normalized_class = class_name.strip().lower()
+        normalized_notes = [
+            note.strip()
+            for note in class_notes
+            if isinstance(note, str) and note.strip()
+        ]
+        if normalized_notes:
+            notes[normalized_class] = normalized_notes
+
+    return notes
+
+
+SPELLCASTING_NOTES = load_spellcasting_notes()
+FEAT_CONFIG = load_feat_config()
+
+
 
 class Character:
     def __init__(self, name, species, char_class, sex, level):
@@ -132,7 +206,12 @@ class Character:
         self.jack_of_all_trades = False  # bard: half prof on non-proficient skills
         self.extra_languages = []        # from racial language choices
         self.asi_log = []                # track each ASI taken {ability: bonus}
+        self.advancement_log = []        # ordered ASI-vs-feat selections
         self.feats = []                  # optional selected feats (dict/object/string)
+        self.speed_bonus = 0
+        self.initiative_bonus = 0
+        self.passive_perception_bonus = 0
+        self.hp_bonus_per_level = 0
         self.proficiencies = []
         self.equipment = []
         self.saving_throw_proficiencies = [
@@ -170,26 +249,30 @@ class Character:
         return features
 
     def get_features_annotated(self):
-        """Return features list with ASI entries annotated with which abilities improved."""
+        """Return features with ASI entries replaced by ASI or feat choices."""
         features = []
-        asi_index = 0
+        advancement_index = 0
         for lvl in range(1, self.level + 1):
             level_data = getattr(Levels, f"{self.char_class}_{lvl}")
             for feat in level_data.features:
                 name = feat['name']
-                if name == 'Ability Score Improvement' and asi_index < len(self.asi_log):
-                    record = self.asi_log[asi_index]
-                    parts = [f"+{v} {k[:3].upper()}" for k, v in record.items() if v > 0]
-                    if parts:
-                        name = f"Ability Score Improvement ({', '.join(parts)})"
-                    asi_index += 1
+                if name == 'Ability Score Improvement' and advancement_index < len(self.advancement_log):
+                    record = self.advancement_log[advancement_index]
+                    if record.get('type') == 'feat':
+                        name = record['feat'].get('summary', record['feat'].get('name', name))
+                    else:
+                        bonuses = record.get('ability_bonuses', {})
+                        parts = [f"+{v} {k[:3].upper()}" for k, v in bonuses.items() if v > 0]
+                        if parts:
+                            name = f"Ability Score Improvement ({', '.join(parts)})"
+                    advancement_index += 1
                 features.append(name)
         return features
 
     def get_speed(self):
         species_key = self.species.lower()
         race_data = getattr(Species, species_key)
-        return race_data.speed
+        return race_data.speed + self.speed_bonus
 
     def get_languages(self):
         species_key = self.species.lower()
@@ -199,7 +282,13 @@ class Character:
         # Rogues learn Thieves' Cant as a secret language at level 1
         if "Thieves' Cant" in self.get_features() and "Thieves' Cant" not in languages:
             languages.append("Thieves' Cant")
-        return languages
+        return list(dict.fromkeys(languages))
+
+    def selected_feat_names(self):
+        return [feat.get('name', str(feat)) for feat in self.feats if isinstance(feat, dict)]
+
+    def passive_perception(self):
+        return 10 + self.skill_modifier('Perception') + self.passive_perception_bonus
 
     def get_traits(self):
         species_key = self.species.lower()
@@ -246,6 +335,12 @@ class Character:
                     asi_levels.append(lvl)
 
         for asi_level in asi_levels:
+            selected_feat = choose_feat_for_character(self, asi_level, FEAT_CONFIG)
+            if selected_feat is not None:
+                self._apply_selected_feat(selected_feat)
+                self.advancement_log.append({'type': 'feat', 'feat': selected_feat})
+                continue
+
             prefer_sc = (spellcast_ability
                          if (spellcast_ability and asi_level <= 15)
                          else None)
@@ -262,6 +357,7 @@ class Character:
                     setattr(self, ability, s + 1)
                     asi_record[ability] = asi_record.get(ability, 0) + 1
             self.asi_log.append(asi_record)
+            self.advancement_log.append({'type': 'asi', 'ability_bonuses': asi_record})
 
     def _rank_asi_candidates(self, prefer_spellcast_ability, prioritize_sub_ten=False):
         """Return (first, second) ability names for one ASI (+2 points total).
@@ -315,7 +411,7 @@ class Character:
         return first, second
 
     def apply_feat_ability_bonuses(self):
-        """Apply ability bonuses granted by selected feats.
+        """Apply any feat effects that were injected but not yet applied.
 
         This method is intentionally permissive because feat payloads can come
         from different sources. Supported feat shapes include:
@@ -326,8 +422,19 @@ class Character:
         numeric `bonus`. Unknown shapes are ignored safely.
         """
         for feat in self.feats:
+            if isinstance(feat, dict) and feat.get('_applied'):
+                continue
             bonuses = []
             if isinstance(feat, dict):
+                if (
+                    feat.get('selected_ability_bonuses')
+                    or feat.get('selected_languages')
+                    or feat.get('selected_proficiencies')
+                    or feat.get('selected_saving_throw')
+                ):
+                    self._apply_feat_effects(feat)
+                    feat['_applied'] = True
+                    continue
                 bonuses = feat.get('ability_bonuses', []) or []
             elif hasattr(feat, 'ability_bonuses'):
                 bonuses = getattr(feat, 'ability_bonuses') or []
@@ -339,6 +446,42 @@ class Character:
                 if ability_key and isinstance(bonus_value, int) and bonus_value > 0:
                     current = getattr(self, ability_key)
                     setattr(self, ability_key, min(20, current + bonus_value))
+
+    def _apply_selected_feat(self, feat):
+        self._apply_feat_effects(feat)
+        feat['_applied'] = True
+        self.feats.append(feat)
+
+    def _apply_feat_effects(self, feat):
+        for ability_name, bonus in feat.get('selected_ability_bonuses', {}).items():
+            current = getattr(self, ability_name)
+            setattr(self, ability_name, min(20, current + int(bonus)))
+
+        for language_name in feat.get('selected_languages', []):
+            if language_name not in self.extra_languages:
+                self.extra_languages.append(language_name)
+
+        for proficiency_name in feat.get('selected_proficiencies', []):
+            if proficiency_name in SKILLS and proficiency_name not in self.skill_proficiencies:
+                self.skill_proficiencies.append(proficiency_name)
+            elif proficiency_name.startswith('Skill: '):
+                skill_name = proficiency_name.replace('Skill: ', '')
+                if skill_name not in self.skill_proficiencies:
+                    self.skill_proficiencies.append(skill_name)
+            elif proficiency_name not in self.proficiencies:
+                self.proficiencies.append(proficiency_name)
+
+        selected_save = feat.get('selected_saving_throw')
+        if selected_save:
+            save_name = selected_save[:3].upper()
+            if save_name not in self.saving_throw_proficiencies:
+                self.saving_throw_proficiencies.append(save_name)
+
+        grants = feat.get('grants', {})
+        self.speed_bonus += int(grants.get('speed_bonus', 0))
+        self.initiative_bonus += int(grants.get('initiative_bonus', 0))
+        self.passive_perception_bonus += int(grants.get('passive_perception_bonus', 0))
+        self.hp_bonus_per_level += int(grants.get('hp_per_level_bonus', 0))
 
     def _normalize_ability_key(self, ability_ref):
         """Normalize SRD-like ability references to internal attribute names."""
@@ -476,9 +619,9 @@ class Character:
         self.choose_expertise()             # Expertise from class features
         self.apply_jack_of_all_trades()     # JOAT half-prof flag
         self.apply_asi()
-        self.apply_feat_ability_bonuses()   # optional feat-granted ability boosts
+        self.apply_feat_ability_bonuses()   # apply any externally injected pending feats
         self.hp = hp(level=self.level, constitution=self.constitution,
-                     hit_die=self.hit_die)
+                 hit_die=self.hit_die) + (self.hp_bonus_per_level * self.level)
 
     def level_up(self):
         self.level += 1
@@ -515,7 +658,7 @@ class Character:
         Proficiency Bonus: +{self.proficiency_bonus()}
         Skill Proficiencies: {', '.join(self.skill_proficiencies)}
         Languages: {', '.join(self.get_languages())}
-        Features: {', '.join(self.get_features())}
+        Features: {', '.join(self.get_features_annotated())}
         """
         print(character_sheet)
 
@@ -552,9 +695,9 @@ class Character:
             "HD": self.hit_die,
             "HDTotal": str(self.hit_die_total()),
             "AC": 10 + modifier(self.dexterity),
-            "Initiative": modifier(self.dexterity),
+            "Initiative": modifier(self.dexterity) + self.initiative_bonus,
             "Speed": self.get_speed(),
-            "Passive": 10 + self.skill_modifier('Perception'),
+            "Passive": self.passive_perception(),
         }
 
         # Saving throws - checkboxes and values
@@ -606,7 +749,11 @@ class Character:
         # Features and Traits (ASI entries include parenthetical ability notes)
         features = self.get_features_annotated()
         fields['Features and Traits'] = '\n'.join(features)
-        fields['Feat+Traits'] = '\n'.join(traits)
+        trait_lines = list(traits)
+        class_notes = SPELLCASTING_NOTES.get(self.char_class, [])
+        if class_notes:
+            trait_lines.extend([''] + class_notes)
+        fields['Feat+Traits'] = '\n'.join(trait_lines)
 
         # Weapon attacks (populate first weapon slot from equipment if applicable)
         weapon_equipped = False
