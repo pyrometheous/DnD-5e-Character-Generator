@@ -288,6 +288,7 @@ AVAILABLE_FONTS = {
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONTS_DIR = os.path.join(BASE_DIR, '.fonts')
+SPELLCARD_BACKGROUND_PATH = os.path.join(BASE_DIR, 'GUI', 'parchment_bg.jpg')
 
 
 def load_spellcasting_notes(config_path=None):
@@ -1717,7 +1718,25 @@ def _spell_components_text(spell):
     return value
 
 
-def _spell_card_body(spell):
+def _wrap_text(text, font_obj, fontsize, max_width):
+    words = [part for part in str(text or '').split() if part]
+    if not words:
+        return []
+
+    lines = []
+    current = words[0]
+    for word in words[1:]:
+        candidate = f"{current} {word}"
+        if font_obj.text_length(candidate, fontsize=fontsize) <= max_width:
+            current = candidate
+        else:
+            lines.append(current)
+            current = word
+    lines.append(current)
+    return lines
+
+
+def _spell_card_lines(spell, font_obj, fontsize, max_width):
     lines = []
 
     level = int(spell.get('level', 0) or 0)
@@ -1731,21 +1750,32 @@ def _spell_card_body(spell):
     subtitle = f"{_spell_level_label(level)} {school}".strip()
     if tags:
         subtitle = f"{subtitle} | {' | '.join(tags)}"
-    lines.append(subtitle)
+    lines.append({'segments': [(subtitle, True)]})
 
     casting_time = str(spell.get('casting_time', '') or '').strip()
     spell_range = str(spell.get('range', '') or '').strip()
     components_text = _spell_components_text(spell)
     duration = str(spell.get('duration', '') or '').strip()
 
-    if casting_time:
-        lines.append(f"Casting Time: {casting_time}")
-    if spell_range:
-        lines.append(f"Range: {spell_range}")
-    if components_text:
-        lines.append(f"Components: {components_text}")
-    if duration:
-        lines.append(f"Duration: {duration}")
+    metadata = [
+        ('Casting Time', casting_time),
+        ('Range', spell_range),
+        ('Components', components_text),
+        ('Duration', duration),
+    ]
+
+    for label, value in metadata:
+        if not value:
+            continue
+        label_text = f"{label}: "
+        label_width = font_obj.text_length(label_text, fontsize=fontsize)
+        first_width = max(20, max_width - label_width)
+        wrapped = _wrap_text(value, font_obj, fontsize, first_width)
+        if not wrapped:
+            continue
+        lines.append({'segments': [(label_text, True), (wrapped[0], False)]})
+        for continuation in wrapped[1:]:
+            lines.append({'segments': [(continuation, False)]})
 
     descriptions = [
         str(paragraph).strip()
@@ -1753,8 +1783,10 @@ def _spell_card_body(spell):
         if str(paragraph).strip()
     ]
     if descriptions:
-        lines.append('')
-        lines.extend(descriptions)
+        lines.append({'segments': []})
+        for paragraph in descriptions:
+            for wrapped_line in _wrap_text(paragraph, font_obj, fontsize, max_width):
+                lines.append({'segments': [(wrapped_line, False)]})
 
     higher_level = [
         str(paragraph).strip()
@@ -1762,11 +1794,87 @@ def _spell_card_body(spell):
         if str(paragraph).strip()
     ]
     if higher_level:
-        lines.append('')
-        lines.append('At Higher Levels:')
-        lines.extend(higher_level)
+        lines.append({'segments': []})
+        lines.append({'segments': [('At Higher Levels:', True)]})
+        for paragraph in higher_level:
+            for wrapped_line in _wrap_text(paragraph, font_obj, fontsize, max_width):
+                lines.append({'segments': [(wrapped_line, False)]})
 
-    return '\n'.join(lines)
+    return lines
+
+
+def _spell_card_height(lines, fontsize):
+    line_height = fontsize * 1.25
+    blank_height = fontsize * 0.7
+    total = 0.0
+    for line in lines:
+        if not line['segments']:
+            total += blank_height
+        else:
+            total += line_height
+    return total
+
+
+def _draw_card_text(page, point, text, font_path, fontsize, bold=False):
+    if bold:
+        page.insert_text(
+            point,
+            text,
+            fontname='custom',
+            fontfile=font_path,
+            fontsize=fontsize,
+            render_mode=2,
+            border_width=0.05,
+        )
+        return
+
+    page.insert_text(
+        point,
+        text,
+        fontname='custom',
+        fontfile=font_path,
+        fontsize=fontsize,
+    )
+
+
+def _draw_spell_card_body(page, body_rect, spell, font_path, font_obj):
+    chosen_size = None
+    chosen_lines = None
+    for body_size in [10, 9.5, 9, 8.5, 8, 7.5, 7, 6.5, 6, 5.5, 5]:
+        lines = _spell_card_lines(spell, font_obj, body_size, body_rect.width)
+        if _spell_card_height(lines, body_size) <= body_rect.height:
+            chosen_size = body_size
+            chosen_lines = lines
+            break
+
+    if chosen_lines is None:
+        chosen_size = 5
+        chosen_lines = _spell_card_lines(spell, font_obj, chosen_size, body_rect.width)
+
+    y = body_rect.y0
+    line_height = chosen_size * 1.25
+    blank_height = chosen_size * 0.7
+    for line in chosen_lines:
+        segments = line['segments']
+        if not segments:
+            y += blank_height
+            continue
+
+        x = body_rect.x0
+        baseline = y + chosen_size
+        for segment_text, is_bold in segments:
+            if not segment_text:
+                continue
+            _draw_card_text(
+                page,
+                fitz.Point(x, baseline),
+                segment_text,
+                font_path,
+                chosen_size,
+                bold=is_bold,
+            )
+            x += font_obj.text_length(segment_text, fontsize=chosen_size)
+        y += line_height
 
 
 def _collect_spell_cards(spellbook):
@@ -1816,6 +1924,7 @@ def append_spell_cards(pdf_path, spellbook, font_name):
         return 0
 
     font_path = download_font(font_name)
+    font_obj = fitz.Font(fontfile=font_path)
 
     page_width = 612
     page_height = 792
@@ -1839,6 +1948,13 @@ def append_spell_cards(pdf_path, spellbook, font_name):
             slot = index % cards_per_page
             if slot == 0:
                 page = doc.new_page(width=page_width, height=page_height)
+                if os.path.exists(SPELLCARD_BACKGROUND_PATH):
+                    page.insert_image(
+                        page.rect,
+                        filename=SPELLCARD_BACKGROUND_PATH,
+                        keep_proportion=False,
+                        overlay=False,
+                    )
 
             row = slot // cols
             col = slot % cols
@@ -1860,32 +1976,23 @@ def append_spell_cards(pdf_path, spellbook, font_name):
             title = str(spell.get('name', 'Unknown Spell') or 'Unknown Spell').strip()
             title_size = 14
             while title_size >= 8:
-                remaining = page.insert_textbox(
-                    title_rect,
-                    title,
-                    fontname='custom',
-                    fontfile=font_path,
-                    fontsize=title_size,
-                    align=fitz.TEXT_ALIGN_CENTER,
-                )
-                if remaining >= 0:
+                title_width = font_obj.text_length(title, fontsize=title_size)
+                if title_width <= title_rect.width:
                     break
                 title_size -= 0.5
 
-            body = _spell_card_body(spell)
-            body_size = 10
-            while body_size >= 5:
-                remaining = page.insert_textbox(
-                    body_rect,
-                    body,
-                    fontname='custom',
-                    fontfile=font_path,
-                    fontsize=body_size,
-                    align=fitz.TEXT_ALIGN_LEFT,
-                )
-                if remaining >= 0:
-                    break
-                body_size -= 0.5
+            title_x = title_rect.x0 + ((title_rect.width - title_width) / 2)
+            title_y = title_rect.y0 + ((title_rect.height + title_size) / 2) - 1
+            _draw_card_text(
+                page,
+                fitz.Point(title_x, title_y),
+                title,
+                font_path,
+                title_size,
+                bold=True,
+            )
+
+            _draw_spell_card_body(page, body_rect, spell, font_path, font_obj)
 
         temp_path = f"{pdf_path}.tmp"
         doc.save(temp_path, deflate=True)
