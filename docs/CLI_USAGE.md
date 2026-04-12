@@ -38,6 +38,7 @@ py main.py [OPTIONS]
 - `--characters` number of characters
 - `--balance` build theoretically balanced party
 - `--spellbook` build class-appropriate spellbook for caster classes
+- `--spellcards` append 3x5 spell cards to the output PDF for caster classes
 
 ## Examples
 
@@ -53,4 +54,7 @@ python3 main.py --level 8 --characters 4 --balance --class fighter,wizard
 
 # Wizard with spellbook
 python3 main.py --class wizard --level 10 --spellbook
+
+# Wizard with spell cards (also builds spellbook data)
+python3 main.py --class wizard --level 10 --spellcards --font cinzel
 ```

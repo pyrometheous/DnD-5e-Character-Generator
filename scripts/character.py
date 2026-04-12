@@ -1345,7 +1345,7 @@ class Character:
         """
         print(character_sheet)
 
-    def create_pdf_file(self, font_name=None, spellbook=None):
+    def create_pdf_file(self, font_name=None, spellbook=None, spellcards=False):
         input_pdf_filename = "./Character Sheet.pdf"
         output_pdf_filename = f"./{self.name.replace(' ', '_')}_Character_Sheet.pdf"
         urllib.request.urlretrieve(
@@ -1500,6 +1500,17 @@ class Character:
 
         if self.char_class not in SPELLCASTING_ABILITY:
             remove_spell_sheet_page(output_pdf_filename)
+
+        if spellcards:
+            cards_written = append_spell_cards(
+                output_pdf_filename,
+                spellbook=spellbook,
+                font_name=font_name,
+            )
+            if cards_written == 0:
+                print(
+                    "Spell cards requested, but no spells were available for this character."
+                )
 
         print(f"Character sheet saved to: {output_pdf_filename}")
         return
@@ -1678,6 +1689,211 @@ def remove_spell_sheet_page(pdf_path):
 
     if wrote_temp:
         os.replace(temp_path, pdf_path)
+
+
+def _ordinal(level):
+    if 10 <= level % 100 <= 20:
+        suffix = 'th'
+    else:
+        suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(level % 10, 'th')
+    return f"{level}{suffix}"
+
+
+def _spell_level_label(level):
+    if level <= 0:
+        return 'Cantrip'
+    return f"{_ordinal(level)}-level"
+
+
+def _spell_components_text(spell):
+    components = [str(value) for value in (spell.get('components') or [])]
+    if not components:
+        return ''
+
+    value = ', '.join(components)
+    material = str(spell.get('material', '') or '').strip()
+    if material and 'M' in components:
+        value = f"{value} ({material})"
+    return value
+
+
+def _spell_card_body(spell):
+    lines = []
+
+    level = int(spell.get('level', 0) or 0)
+    school = str(spell.get('school', 'Unknown') or 'Unknown')
+    tags = []
+    if bool(spell.get('ritual', False)):
+        tags.append('Ritual')
+    if bool(spell.get('concentration', False)):
+        tags.append('Concentration')
+
+    subtitle = f"{_spell_level_label(level)} {school}".strip()
+    if tags:
+        subtitle = f"{subtitle} | {' | '.join(tags)}"
+    lines.append(subtitle)
+
+    casting_time = str(spell.get('casting_time', '') or '').strip()
+    spell_range = str(spell.get('range', '') or '').strip()
+    components_text = _spell_components_text(spell)
+    duration = str(spell.get('duration', '') or '').strip()
+
+    if casting_time:
+        lines.append(f"Casting Time: {casting_time}")
+    if spell_range:
+        lines.append(f"Range: {spell_range}")
+    if components_text:
+        lines.append(f"Components: {components_text}")
+    if duration:
+        lines.append(f"Duration: {duration}")
+
+    descriptions = [
+        str(paragraph).strip()
+        for paragraph in (spell.get('desc') or [])
+        if str(paragraph).strip()
+    ]
+    if descriptions:
+        lines.append('')
+        lines.extend(descriptions)
+
+    higher_level = [
+        str(paragraph).strip()
+        for paragraph in (spell.get('higher_level') or [])
+        if str(paragraph).strip()
+    ]
+    if higher_level:
+        lines.append('')
+        lines.append('At Higher Levels:')
+        lines.extend(higher_level)
+
+    return '\n'.join(lines)
+
+
+def _collect_spell_cards(spellbook):
+    if not spellbook:
+        return []
+
+    seen = set()
+    cards = []
+
+    def add_spell(spell):
+        if not isinstance(spell, dict):
+            return
+        key = str(spell.get('index') or spell.get('name') or '').strip().lower()
+        if not key or key in seen:
+            return
+        seen.add(key)
+        cards.append(spell)
+
+    for spell in spellbook.get('cantrips', []):
+        add_spell(spell)
+
+    for spell in spellbook.get('always_prepared', []):
+        add_spell(spell)
+
+    spells_by_level = spellbook.get('spells_by_level', {})
+    for _, spells in sorted(
+        spells_by_level.items(),
+        key=lambda item: int(item[0]),
+    ):
+        for spell in spells:
+            add_spell(spell)
+
+    mystic_arcanum = spellbook.get('mystic_arcanum', {})
+    for _, spell in sorted(
+        mystic_arcanum.items(),
+        key=lambda item: int(item[0]),
+    ):
+        add_spell(spell)
+
+    cards.sort(key=lambda entry: (int(entry.get('level', 0) or 0), entry.get('name', '')))
+    return cards
+
+
+def append_spell_cards(pdf_path, spellbook, font_name):
+    cards = _collect_spell_cards(spellbook)
+    if not cards:
+        return 0
+
+    font_path = download_font(font_name)
+
+    page_width = 612
+    page_height = 792
+    card_width = 216
+    card_height = 360
+    cols = page_width // card_width
+    rows = page_height // card_height
+    cards_per_page = int(cols * rows)
+    if cards_per_page <= 0:
+        return 0
+
+    grid_width = cols * card_width
+    grid_height = rows * card_height
+    grid_x0 = (page_width - grid_width) / 2
+    grid_y0 = (page_height - grid_height) / 2
+
+    doc = fitz.open(pdf_path)
+    try:
+        page = None
+        for index, spell in enumerate(cards):
+            slot = index % cards_per_page
+            if slot == 0:
+                page = doc.new_page(width=page_width, height=page_height)
+
+            row = slot // cols
+            col = slot % cols
+            x0 = grid_x0 + (col * card_width)
+            y0 = grid_y0 + (row * card_height)
+            card_rect = fitz.Rect(x0, y0, x0 + card_width, y0 + card_height)
+
+            page.draw_rect(card_rect, color=(0, 0, 0), width=0.8)
+
+            inner = fitz.Rect(
+                card_rect.x0 + 12,
+                card_rect.y0 + 12,
+                card_rect.x1 - 12,
+                card_rect.y1 - 12,
+            )
+            title_rect = fitz.Rect(inner.x0, inner.y0, inner.x1, inner.y0 + 26)
+            body_rect = fitz.Rect(inner.x0, title_rect.y1 + 6, inner.x1, inner.y1)
+
+            title = str(spell.get('name', 'Unknown Spell') or 'Unknown Spell').strip()
+            title_size = 14
+            while title_size >= 8:
+                remaining = page.insert_textbox(
+                    title_rect,
+                    title,
+                    fontname='custom',
+                    fontfile=font_path,
+                    fontsize=title_size,
+                    align=fitz.TEXT_ALIGN_CENTER,
+                )
+                if remaining >= 0:
+                    break
+                title_size -= 0.5
+
+            body = _spell_card_body(spell)
+            body_size = 10
+            while body_size >= 5:
+                remaining = page.insert_textbox(
+                    body_rect,
+                    body,
+                    fontname='custom',
+                    fontfile=font_path,
+                    fontsize=body_size,
+                    align=fitz.TEXT_ALIGN_LEFT,
+                )
+                if remaining >= 0:
+                    break
+                body_size -= 0.5
+
+        temp_path = f"{pdf_path}.tmp"
+        doc.save(temp_path, deflate=True)
+    finally:
+        doc.close()
+
+    os.replace(temp_path, pdf_path)
+    return len(cards)
 
 
 def apply_custom_font(pdf_path, font_name, expertise_skills=None):

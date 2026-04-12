@@ -1119,8 +1119,20 @@ def _finalize_spellcasting_profile(character_obj, spellbook_config: dict):
 
 def _spell_to_dict(spell) -> dict:
     school = getattr(spell, 'school', {}) or {}
+    desc = list(getattr(spell, 'desc', []) or [])
+    higher_level = list(getattr(spell, 'higher_level', []) or [])
     return {
+        'index': getattr(spell, 'index', ''),
         'name': spell.name,
         'level': int(spell.level),
         'school': school.get('name', 'Unknown'),
+        'casting_time': getattr(spell, 'casting_time', ''),
+        'range': getattr(spell, 'range', ''),
+        'components': list(getattr(spell, 'components', []) or []),
+        'material': getattr(spell, 'material', ''),
+        'duration': getattr(spell, 'duration', ''),
+        'ritual': bool(getattr(spell, 'ritual', False)),
+        'concentration': bool(getattr(spell, 'concentration', False)),
+        'desc': desc,
+        'higher_level': higher_level,
     }

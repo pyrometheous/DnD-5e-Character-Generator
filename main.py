@@ -112,6 +112,13 @@ def main():
             "spellcasting character."
         )
     )
+    parser.add_argument(
+        '--spellcards', action='store_true',
+        help=(
+            "Append 3x5 spell cards to the output PDF for each "
+            "spellcasting character."
+        )
+    )
     args = parser.parse_args()
 
     valid_species = [s.capitalize() for s in Species.entries]
@@ -136,8 +143,15 @@ def main():
                 print(f"\n--- Character {index} of {args.characters} ---")
             new_character = party_member['character']
             new_character.display_character_sheet()
-            spellbook = maybe_generate_spellbook(new_character, args.spellbook)
-            new_character.create_pdf_file(font_name=args.font, spellbook=spellbook)
+            spellbook = maybe_generate_spellbook(
+                new_character,
+                args.spellbook or args.spellcards,
+            )
+            new_character.create_pdf_file(
+                font_name=args.font,
+                spellbook=spellbook,
+                spellcards=args.spellcards,
+            )
         return
 
     for index in range(args.characters):
@@ -149,8 +163,15 @@ def main():
             species=choose_requested_value(selected_species, index),
         )
         new_character.display_character_sheet()
-        spellbook = maybe_generate_spellbook(new_character, args.spellbook)
-        new_character.create_pdf_file(font_name=args.font, spellbook=spellbook)
+        spellbook = maybe_generate_spellbook(
+            new_character,
+            args.spellbook or args.spellcards,
+        )
+        new_character.create_pdf_file(
+            font_name=args.font,
+            spellbook=spellbook,
+            spellcards=args.spellcards,
+        )
 
 
 if __name__ == "__main__":
