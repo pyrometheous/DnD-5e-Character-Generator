@@ -325,6 +325,35 @@ AVAILABLE_FONTS = {
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONTS_DIR = os.path.join(BASE_DIR, '.fonts')
 SPELLCARD_BACKGROUND_PATH = os.path.join(BASE_DIR, 'GUI', 'parchment_bg.jpg')
+SPELLCARD_CONCENTRATION_ICON_PATH = os.path.join(BASE_DIR, 'GUI', 'icons', 'bootstrap-c-circle.svg')
+SPELLCARD_ICON_PIXMAP_CACHE = {}
+
+SPELL_SCHOOL_ICON_CODES = {
+    'abjuration': 'ABJ',
+    'conjuration': 'CONJ',
+    'divination': 'DIV',
+    'enchantment': 'ENCH',
+    'evocation': 'EVO',
+    'illusion': 'ILL',
+    'necromancy': 'NEC',
+    'transmutation': 'TRAN',
+}
+
+SPELLCARD_ICON_CODE_CONCENTRATION = 'CONC'
+SPELLCARD_ICON_CODE_RITUAL = 'RIT'
+
+SPELLCARD_ICON_LEGEND = {
+    'ABJ': 'Abjuration',
+    'CONJ': 'Conjuration',
+    'DIV': 'Divination',
+    'ENCH': 'Enchantment',
+    'EVO': 'Evocation',
+    'ILL': 'Illusion',
+    'NEC': 'Necromancy',
+    'TRAN': 'Transmutation',
+    SPELLCARD_ICON_CODE_RITUAL: 'Ritual',
+    SPELLCARD_ICON_CODE_CONCENTRATION: 'Concentration',
+}
 
 
 def load_spellcasting_notes(config_path=None):
@@ -1947,21 +1976,169 @@ def _wrap_text(text, font_obj, fontsize, max_width):
     return lines
 
 
+def _load_svg_icon_pixmap(svg_path, pixel_size):
+    cache_key = (str(svg_path), int(pixel_size))
+    cached = SPELLCARD_ICON_PIXMAP_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    if not os.path.exists(svg_path):
+        return None
+
+    try:
+        with open(svg_path, 'rb') as handle:
+            svg_bytes = handle.read()
+        icon_doc = fitz.open('svg', svg_bytes)
+        try:
+            icon_page = icon_doc[0]
+            max_dim = max(icon_page.rect.width, icon_page.rect.height)
+            if max_dim <= 0:
+                return None
+            scale = float(pixel_size) / float(max_dim)
+            pixmap = icon_page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=True)
+        finally:
+            icon_doc.close()
+    except (OSError, RuntimeError, ValueError):
+        return None
+
+    SPELLCARD_ICON_PIXMAP_CACHE[cache_key] = pixmap
+    return pixmap
+
+
+def _icon_token(code):
+    return f'__ICON_{str(code).upper()}__'
+
+
+def _icon_code_from_token(text):
+    value = str(text or '')
+    if not (value.startswith('__ICON_') and value.endswith('__')):
+        return None
+    return value[len('__ICON_'):-2]
+
+
+def _spell_icon_codes(spell):
+    school = str(spell.get('school', 'Unknown') or 'Unknown').strip().lower()
+    school_code = SPELL_SCHOOL_ICON_CODES.get(school, school[:3].upper() or 'UNK')
+
+    codes = [school_code]
+    if bool(spell.get('ritual', False)):
+        codes.append(SPELLCARD_ICON_CODE_RITUAL)
+    if bool(spell.get('concentration', False)):
+        codes.append(SPELLCARD_ICON_CODE_CONCENTRATION)
+    return codes
+
+
+def _draw_concentration_icon(page, x, baseline, icon_size):
+    target_size = max(8, int(round(icon_size * 2)))
+    pixmap = _load_svg_icon_pixmap(SPELLCARD_CONCENTRATION_ICON_PATH, target_size)
+    if pixmap is None:
+        return False
+
+    icon_rect = fitz.Rect(
+        x,
+        baseline - icon_size,
+        x + icon_size,
+        baseline,
+    )
+    page.insert_image(icon_rect, pixmap=pixmap, keep_proportion=True, overlay=True)
+    return True
+
+
+def _draw_icon_badge(page, x, baseline, label, font_path, font_obj, fontsize):
+    label = str(label or '').strip().upper()
+    if not label:
+        return 0
+
+    text_size = max(6, fontsize - 0.3)
+    text_width = font_obj.text_length(label, fontsize=text_size)
+    pad_x = 2.4
+    badge_width = text_width + (pad_x * 2)
+    badge_height = text_size + 2.8
+
+    rect = fitz.Rect(
+        x,
+        baseline - badge_height,
+        x + badge_width,
+        baseline + 0.9,
+    )
+    page.draw_rect(rect, color=(0, 0, 0), width=0.5)
+
+    text_x = rect.x0 + ((rect.width - text_width) / 2)
+    text_y = baseline - 0.95
+    _draw_card_text(page, fitz.Point(text_x, text_y), label, font_path, text_size)
+    return rect.width
+
+
+def _draw_icon_token(page, x, baseline, code, font_path, font_obj, fontsize):
+    code = str(code or '').strip().upper()
+    if not code:
+        return 0
+
+    if code == SPELLCARD_ICON_CODE_CONCENTRATION:
+        icon_size = max(7, fontsize)
+        if _draw_concentration_icon(page, x, baseline, icon_size):
+            return icon_size
+        return _draw_icon_badge(page, x, baseline, 'C', font_path, font_obj, fontsize)
+
+    if code == SPELLCARD_ICON_CODE_RITUAL:
+        return _draw_icon_badge(page, x, baseline, 'R', font_path, font_obj, fontsize)
+
+    return _draw_icon_badge(page, x, baseline, code, font_path, font_obj, fontsize)
+
+
+def _icon_token_width(code, font_obj, fontsize):
+    code = str(code or '').strip().upper()
+    if not code:
+        return 0
+
+    if code == SPELLCARD_ICON_CODE_CONCENTRATION:
+        return max(7, fontsize)
+
+    label = 'R' if code == SPELLCARD_ICON_CODE_RITUAL else code
+    text_size = max(6, fontsize - 0.4)
+    text_width = font_obj.text_length(label, fontsize=text_size)
+    return text_width + 4.0
+
+
+def _draw_icon_legend(page, codes, x0, y0, max_width, font_path, font_obj):
+    if not codes:
+        return
+
+    text_size = 8
+    spacing = 10
+    y = y0
+    x = x0
+    line_height = 11
+
+    for code in codes:
+        label = SPELLCARD_ICON_LEGEND.get(code, code)
+        icon_width = _icon_token_width(code, font_obj, text_size)
+        label_text = f" {label}"
+        label_width = font_obj.text_length(label_text, fontsize=text_size)
+        entry_width = icon_width + label_width + spacing
+
+        if (x + entry_width) > (x0 + max_width):
+            x = x0
+            y += line_height
+
+        used_icon_width = _draw_icon_token(page, x, y, code, font_path, font_obj, text_size)
+        x += used_icon_width
+        _draw_card_text(page, fitz.Point(x, y), label_text, font_path, text_size)
+        x += label_width + spacing
+
+
 def _spell_card_lines(spell, font_obj, fontsize, max_width):
     lines = []
 
     level = int(spell.get('level', 0) or 0)
-    school = str(spell.get('school', 'Unknown') or 'Unknown')
-    tags = []
-    if bool(spell.get('ritual', False)):
-        tags.append('Ritual')
-    if bool(spell.get('concentration', False)):
-        tags.append('Concentration')
+    icon_codes = _spell_icon_codes(spell)
 
-    subtitle = f"{_spell_level_label(level)} {school}".strip()
-    if tags:
-        subtitle = f"{subtitle} | {' | '.join(tags)}"
-    lines.append({'segments': [(subtitle, True)]})
+    subtitle_segments = [(f"{_spell_level_label(level)}", True)]
+    for code in icon_codes:
+        subtitle_segments.append((' | ', True))
+        subtitle_segments.append((_icon_token(code), True))
+
+    lines.append({'segments': subtitle_segments})
 
     casting_time = str(spell.get('casting_time', '') or '').strip()
     spell_range = str(spell.get('range', '') or '').strip()
@@ -2072,6 +2249,20 @@ def _draw_spell_card_body(page, body_rect, spell, font_path, font_obj):
             if not segment_text:
                 continue
             segment_size = chosen_size + (emphasis_size_delta if is_emphasized else 0)
+            icon_code = _icon_code_from_token(segment_text)
+            if icon_code:
+                icon_width = _draw_icon_token(
+                    page,
+                    x,
+                    baseline,
+                    icon_code,
+                    font_path,
+                    font_obj,
+                    segment_size,
+                )
+                x += icon_width + 2
+                continue
+
             _draw_card_text(
                 page,
                 fitz.Point(x, baseline),
@@ -2149,58 +2340,76 @@ def append_spell_cards(pdf_path, spellbook, font_name):
 
     doc = fitz.open(pdf_path)
     try:
-        page = None
-        for index, spell in enumerate(cards):
-            slot = index % cards_per_page
-            if slot == 0:
-                page = doc.new_page(width=page_width, height=page_height)
-                if os.path.exists(SPELLCARD_BACKGROUND_PATH):
-                    page.insert_image(
-                        page.rect,
-                        filename=SPELLCARD_BACKGROUND_PATH,
-                        keep_proportion=False,
-                        overlay=False,
-                    )
+        for page_start in range(0, len(cards), cards_per_page):
+            page_cards = cards[page_start:page_start + cards_per_page]
+            page = doc.new_page(width=page_width, height=page_height)
+            if os.path.exists(SPELLCARD_BACKGROUND_PATH):
+                page.insert_image(
+                    page.rect,
+                    filename=SPELLCARD_BACKGROUND_PATH,
+                    keep_proportion=False,
+                    overlay=False,
+                )
 
-            row = slot // cols
-            col = slot % cols
-            x0 = grid_x0 + (col * card_width)
-            y0 = grid_y0 + (row * card_height)
-            card_rect = fitz.Rect(x0, y0, x0 + card_width, y0 + card_height)
+            used_codes = []
+            seen_codes = set()
+            for spell in page_cards:
+                for code in _spell_icon_codes(spell):
+                    if code not in seen_codes:
+                        used_codes.append(code)
+                        seen_codes.add(code)
 
-            page.draw_rect(card_rect, color=(0, 0, 0), width=0.8)
+            if used_codes:
+                _draw_icon_legend(
+                    page,
+                    codes=used_codes,
+                    x0=grid_x0 + 2,
+                    y0=page_height - 13,
+                    max_width=grid_width - 4,
+                    font_path=font_path,
+                    font_obj=font_obj,
+                )
 
-            inner = fitz.Rect(
-                card_rect.x0 + 12,
-                card_rect.y0 + 12,
-                card_rect.x1 - 12,
-                card_rect.y1 - 12,
-            )
-            title_rect = fitz.Rect(inner.x0, inner.y0, inner.x1, inner.y0 + 26)
-            body_rect = fitz.Rect(inner.x0, title_rect.y1 + 6, inner.x1, inner.y1)
+            for slot, spell in enumerate(page_cards):
+                row = slot // cols
+                col = slot % cols
+                x0 = grid_x0 + (col * card_width)
+                y0 = grid_y0 + (row * card_height)
+                card_rect = fitz.Rect(x0, y0, x0 + card_width, y0 + card_height)
 
-            title = str(spell.get('name', 'Unknown Spell') or 'Unknown Spell').strip()
-            title_size = 14
-            title_emphasis_delta = 1.0
-            rendered_title_size = title_size + title_emphasis_delta
-            while title_size >= 8:
+                page.draw_rect(card_rect, color=(0, 0, 0), width=0.8)
+
+                inner = fitz.Rect(
+                    card_rect.x0 + 12,
+                    card_rect.y0 + 12,
+                    card_rect.x1 - 12,
+                    card_rect.y1 - 12,
+                )
+                title_rect = fitz.Rect(inner.x0, inner.y0, inner.x1, inner.y0 + 26)
+                body_rect = fitz.Rect(inner.x0, title_rect.y1 + 6, inner.x1, inner.y1)
+
+                title = str(spell.get('name', 'Unknown Spell') or 'Unknown Spell').strip()
+                title_size = 14
+                title_emphasis_delta = 1.0
                 rendered_title_size = title_size + title_emphasis_delta
-                title_width = font_obj.text_length(title, fontsize=rendered_title_size)
-                if title_width <= title_rect.width:
-                    break
-                title_size -= 0.5
+                while title_size >= 8:
+                    rendered_title_size = title_size + title_emphasis_delta
+                    title_width = font_obj.text_length(title, fontsize=rendered_title_size)
+                    if title_width <= title_rect.width:
+                        break
+                    title_size -= 0.5
 
-            title_x = title_rect.x0 + ((title_rect.width - title_width) / 2)
-            title_y = title_rect.y0 + ((title_rect.height + rendered_title_size) / 2) - 1
-            _draw_card_text(
-                page,
-                fitz.Point(title_x, title_y),
-                title,
-                font_path,
-                rendered_title_size,
-            )
+                title_x = title_rect.x0 + ((title_rect.width - title_width) / 2)
+                title_y = title_rect.y0 + ((title_rect.height + rendered_title_size) / 2) - 1
+                _draw_card_text(
+                    page,
+                    fitz.Point(title_x, title_y),
+                    title,
+                    font_path,
+                    rendered_title_size,
+                )
 
-            _draw_spell_card_body(page, body_rect, spell, font_path, font_obj)
+                _draw_spell_card_body(page, body_rect, spell, font_path, font_obj)
 
         temp_path = f"{pdf_path}.tmp"
         doc.save(temp_path, deflate=True)
