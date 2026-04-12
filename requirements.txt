@@ -1,6 +1,5 @@
 fictional_names
 tinys_srd
-requests
 fillpdf
 PyMuPDF
 pygame>=2.5.2
