@@ -2015,30 +2015,21 @@ def _spell_card_lines(spell, font_obj, fontsize, max_width):
 
 
 def _spell_card_height(lines, fontsize):
-    line_height = fontsize * 1.25
     blank_height = fontsize * 0.7
     total = 0.0
     for line in lines:
         if not line['segments']:
             total += blank_height
         else:
+            line_size = fontsize
+            if any(is_emphasized for _, is_emphasized in line['segments']):
+                line_size += 0.5
+            line_height = line_size * 1.25
             total += line_height
     return total
 
 
-def _draw_card_text(page, point, text, font_path, fontsize, bold=False):
-    if bold:
-        page.insert_text(
-            point,
-            text,
-            fontname='custom',
-            fontfile=font_path,
-            fontsize=fontsize,
-            render_mode=2,
-            border_width=0.05,
-        )
-        return
-
+def _draw_card_text(page, point, text, font_path, fontsize):
     page.insert_text(
         point,
         text,
@@ -2049,6 +2040,7 @@ def _draw_card_text(page, point, text, font_path, fontsize, bold=False):
 
 
 def _draw_spell_card_body(page, body_rect, spell, font_path, font_obj):
+    emphasis_size_delta = 1.5
     chosen_size = None
     chosen_lines = None
     for body_size in [10, 9.5, 9, 8.5, 8, 7.5, 7, 6.5, 6, 5.5, 5]:
@@ -2063,7 +2055,6 @@ def _draw_spell_card_body(page, body_rect, spell, font_path, font_obj):
         chosen_lines = _spell_card_lines(spell, font_obj, chosen_size, body_rect.width)
 
     y = body_rect.y0
-    line_height = chosen_size * 1.25
     blank_height = chosen_size * 0.7
     for line in chosen_lines:
         segments = line['segments']
@@ -2071,21 +2062,25 @@ def _draw_spell_card_body(page, body_rect, spell, font_path, font_obj):
             y += blank_height
             continue
 
+        line_size = chosen_size
+        if any(is_emphasized for _, is_emphasized in segments):
+            line_size += emphasis_size_delta
+
         x = body_rect.x0
-        baseline = y + chosen_size
-        for segment_text, is_bold in segments:
+        baseline = y + line_size
+        for segment_text, is_emphasized in segments:
             if not segment_text:
                 continue
+            segment_size = chosen_size + (emphasis_size_delta if is_emphasized else 0)
             _draw_card_text(
                 page,
                 fitz.Point(x, baseline),
                 segment_text,
                 font_path,
-                chosen_size,
-                bold=is_bold,
+                segment_size,
             )
-            x += font_obj.text_length(segment_text, fontsize=chosen_size)
-        y += line_height
+            x += font_obj.text_length(segment_text, fontsize=segment_size)
+        y += line_size * 1.25
 
 
 def _collect_spell_cards(spellbook):
@@ -2186,21 +2181,23 @@ def append_spell_cards(pdf_path, spellbook, font_name):
 
             title = str(spell.get('name', 'Unknown Spell') or 'Unknown Spell').strip()
             title_size = 14
+            title_emphasis_delta = 1.0
+            rendered_title_size = title_size + title_emphasis_delta
             while title_size >= 8:
-                title_width = font_obj.text_length(title, fontsize=title_size)
+                rendered_title_size = title_size + title_emphasis_delta
+                title_width = font_obj.text_length(title, fontsize=rendered_title_size)
                 if title_width <= title_rect.width:
                     break
                 title_size -= 0.5
 
             title_x = title_rect.x0 + ((title_rect.width - title_width) / 2)
-            title_y = title_rect.y0 + ((title_rect.height + title_size) / 2) - 1
+            title_y = title_rect.y0 + ((title_rect.height + rendered_title_size) / 2) - 1
             _draw_card_text(
                 page,
                 fitz.Point(title_x, title_y),
                 title,
                 font_path,
-                title_size,
-                bold=True,
+                rendered_title_size,
             )
 
             _draw_spell_card_body(page, body_rect, spell, font_path, font_obj)
