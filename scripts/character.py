@@ -75,6 +75,18 @@ SPELLCASTING_ABILITY = {
     'warlock': 'charisma', 'wizard': 'intelligence',
 }
 
+SPELL_SLOT_FIELD_MAP = {
+    1: 'SlotsTotal 19',
+    2: 'SlotsTotal 20',
+    3: 'SlotsTotal 21',
+    4: 'SlotsTotal 22',
+    5: 'SlotsTotal 23',
+    6: 'SlotsTotal 24',
+    7: 'SlotsTotal 25',
+    8: 'SlotsTotal 26',
+    9: 'SlotsTotal 27',
+}
+
 AVAILABLE_FONTS = {
     'cinzel':        {'css': 'Cinzel:wght@400;700',         'desc': 'Elegant serif, great readability'},
     'medievalsharp': {'css': 'MedievalSharp',                'desc': 'Whimsical medieval script'},
@@ -385,22 +397,7 @@ class Character:
                 fields['SpellSaveDC  2'] = 8 + prof_bonus + spell_mod
                 fields['SpellAtkBonus 2'] = f"+{prof_bonus + spell_mod}"
                 fields['Spellcasting Class 2'] = self.char_class.capitalize()
-
-                slot_field_map = {
-                    'spell_slots_level_1': 'SlotsTotal 19',
-                    'spell_slots_level_2': 'SlotsTotal 20',
-                    'spell_slots_level_3': 'SlotsTotal 21',
-                    'spell_slots_level_4': 'SlotsTotal 22',
-                    'spell_slots_level_5': 'SlotsTotal 23',
-                    'spell_slots_level_6': 'SlotsTotal 24',
-                    'spell_slots_level_7': 'SlotsTotal 25',
-                    'spell_slots_level_8': 'SlotsTotal 26',
-                    'spell_slots_level_9': 'SlotsTotal 27',
-                }
-                for slot_key, field_name in slot_field_map.items():
-                    slots = sc.get(slot_key, 0)
-                    if slots > 0:
-                        fields[field_name] = slots
+                fields.update(build_spell_slot_fields(sc, spellbook=spellbook))
 
         apply_spellbook_fields(fields, spellbook)
 
@@ -416,6 +413,26 @@ class Character:
 
 def modifier(ability_score):
     return (ability_score - 10) // 2
+
+
+def build_spell_slot_fields(spellcasting, spellbook=None):
+    """Map class spell slot progression to page 3 slot fields.
+
+    The spell sheet has both total and expended slot columns. We fill
+    total slots only, and always leave expended slots blank.
+    """
+    fields = {}
+    for level, total_field in SPELL_SLOT_FIELD_MAP.items():
+        slot_key = f"spell_slots_level_{level}"
+        slots = int(spellcasting.get(slot_key, 0) or 0)
+        remaining_field = total_field.replace('SlotsTotal', 'SlotsRemaining')
+
+        # Keep SLOTS EXPENDED blank on generated sheets.
+        fields[remaining_field] = ''
+
+        # SLOTS TOTAL should reflect available slots even if no spells were selected.
+        fields[total_field] = str(slots) if slots > 0 else ''
+    return fields
 
 
 def download_font(font_name):
