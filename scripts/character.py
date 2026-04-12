@@ -146,8 +146,19 @@ class Character:
         return class_levels.prof_bonus
 
     def ability_score_improvements(self):
-        class_levels = getattr(Levels, f"{self.char_class}_{self.level}")
-        return class_levels.ability_score_bonuses
+        """Return the total number of ASIs granted at the current level.
+
+        Uses feature scanning rather than the ability_score_bonuses field from
+        tinys_srd, which is known to report an incorrect value of 5 (instead of
+        6) for the Rogue at level 20.
+        """
+        count = 0
+        for lvl in range(1, self.level + 1):
+            level_data = getattr(Levels, f"{self.char_class}_{lvl}")
+            for feat in level_data.features:
+                if feat['name'] == 'Ability Score Improvement':
+                    count += 1
+        return count
 
     def get_features(self):
         features = []
@@ -203,20 +214,82 @@ class Character:
             setattr(self, ability, current + bonus['bonus'])
 
     def apply_asi(self):
-        num_asi = self.ability_score_improvements()
-        abilities = ['strength', 'dexterity', 'constitution',
-                     'intelligence', 'wisdom', 'charisma']
-        for _ in range(num_asi):
-            # Each ASI gives +2 total, typically +2 to one or +1 to two
-            # Randomly boost two different abilities by +1 each
-            chosen = random.sample(abilities, 2)
+        """Apply all Ability Score Improvements earned up to the current level.
+
+        Each ASI distributes +2 points using the following priority:
+
+        For spellcasters at ASI levels ≤ 15
+          1. Spellcasting ability (regardless of current parity)
+          2. Any other ability currently at an odd score  (odd → even = +1 modifier)
+          3. Any other ability < 20
+
+        For non-casters, or ASI levels > 15
+          1. Any ability currently at an odd score  (odd → even = +1 modifier)
+          2. Any ability < 20
+
+        ASI levels are discovered from class feature names rather than the
+        ability_score_bonuses field, which has a known data error for Rogue.
+        """
+        spellcast_ability = SPELLCASTING_ABILITY.get(self.char_class)
+
+        # Collect the character level at which each ASI is granted, in order.
+        asi_levels = []
+        for lvl in range(1, self.level + 1):
+            level_data = getattr(Levels, f"{self.char_class}_{lvl}")
+            for feat in level_data.features:
+                if feat['name'] == 'Ability Score Improvement':
+                    asi_levels.append(lvl)
+
+        for asi_level in asi_levels:
+            prefer_sc = (spellcast_ability
+                         if (spellcast_ability and asi_level <= 15)
+                         else None)
+            first, second = self._rank_asi_candidates(prefer_sc)
+
             asi_record = {}
-            for ability in chosen:
-                current = getattr(self, ability)
-                if current < 20:
-                    setattr(self, ability, current + 1)
-                    asi_record[ability] = 1
+            for ability in (a for a in (first, second) if a is not None):
+                s = getattr(self, ability)
+                if s < 20:
+                    setattr(self, ability, s + 1)
+                    asi_record[ability] = asi_record.get(ability, 0) + 1
             self.asi_log.append(asi_record)
+
+    def _rank_asi_candidates(self, prefer_spellcast_ability):
+        """Return (first, second) ability names for one ASI (+2 points total).
+
+        first  — highest-priority target for the first +1 point
+        second — highest-priority target for the second +1 point (may equal
+                 first only when every other ability is already at 20)
+
+        Odd-scored abilities are preferred because each +1 raises the modifier
+        (odd+1 = even causes modifier floor to increase).  The spellcasting
+        ability is promoted to the front of that queue when preferred.
+        """
+        all_abilities = ['strength', 'dexterity', 'constitution',
+                         'intelligence', 'wisdom', 'charisma']
+        under_cap = [a for a in all_abilities if getattr(self, a) < 20]
+        if not under_cap:
+            return None, None
+
+        odd_under_cap = [a for a in under_cap if getattr(self, a) % 2 == 1]
+
+        # First point
+        if prefer_spellcast_ability and prefer_spellcast_ability in under_cap:
+            first = prefer_spellcast_ability
+        elif odd_under_cap:
+            first = random.choice(odd_under_cap)
+        else:
+            first = random.choice(under_cap)
+
+        # Second point: prefer a *different* odd ability if one exists
+        odd_for_second = [a for a in odd_under_cap if a != first]
+        if odd_for_second:
+            second = random.choice(odd_for_second)
+        else:
+            other_under = [a for a in under_cap if a != first]
+            second = random.choice(other_under) if other_under else first
+
+        return first, second
 
     def choose_skill_proficiencies(self):
         cls = getattr(Classes, self.char_class)
