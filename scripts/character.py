@@ -601,12 +601,58 @@ class Character:
             features.extend(self.bonus_features_by_level.get(lvl, []))
         return features
 
+    def _collect_feature_entries(self, annotated=False):
+        """Return ordered (level, label) entries for class/subclass features."""
+        entries = []
+        advancement_index = 0
+        for lvl in range(1, self.level + 1):
+            level_data = getattr(Levels, f"{self.char_class}_{lvl}")
+            for feature in level_data.features:
+                entries.append((
+                    lvl,
+                    self._feature_label(
+                        lvl,
+                        feature,
+                        annotated=annotated,
+                        advancement_index=advancement_index,
+                    ),
+                ))
+                if feature['name'] == 'Ability Score Improvement':
+                    advancement_index += 1
+            for bonus_feature in self.bonus_features_by_level.get(lvl, []):
+                entries.append((lvl, bonus_feature))
+        return entries
+
+    def _condense_feature_entries(self, entries):
+        """Collapse repeated features into one line with counts and levels."""
+        order = []
+        levels_by_label = {}
+        for level, label in entries:
+            if label not in levels_by_label:
+                levels_by_label[label] = []
+                order.append(label)
+            levels_by_label[label].append(level)
+
+        condensed = []
+        for label in order:
+            levels = levels_by_label[label]
+            if len(levels) <= 1:
+                condensed.append(label)
+                continue
+            level_text = ', '.join(f"lv {lvl}" for lvl in levels)
+            condensed.append(f"{label} ({len(levels)}x: {level_text})")
+        return condensed
+
     def get_features(self):
         return self._collect_feature_names(annotated=False)
 
     def get_features_annotated(self):
         """Return features with progression choices and ASI entries annotated."""
         return self._collect_feature_names(annotated=True)
+
+    def get_features_annotated_condensed(self):
+        """Return annotated features with repeated items collapsed by level."""
+        return self._condense_feature_entries(self._collect_feature_entries(annotated=True))
 
     def armor_class(self):
         return 10 + modifier(self.dexterity) + self.armor_class_bonus
@@ -1384,7 +1430,7 @@ class Character:
         fields['ProficienciesLang'] = '\n'.join(prof_lines)
 
         # Features and Traits (ASI entries include parenthetical ability notes)
-        features = self.get_features_annotated()
+        features = self.get_features_annotated_condensed()
         all_feature_trait_lines = list(features)
         if traits:
             all_feature_trait_lines.extend([''] + list(traits))
