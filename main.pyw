@@ -125,15 +125,31 @@ def draw_text(
 
 
 class Dropdown:
-    def __init__(self, options: list[str], value: str):
+    def __init__(self, options: list[str], value: str, option_font_getter=None):
         self.options = [str(option) for option in options]
         self.value = str(value)
+        self.option_font_getter = option_font_getter
         self.rect = pygame.Rect(0, 0, 0, 0)
         self.drop_rect = pygame.Rect(0, 0, 0, 0)
         self.option_rects: list[tuple[str, pygame.Rect]] = []
         self.open = False
         self.scroll_index = 0
         self.max_visible = 9
+
+    def font_for_option(
+        self,
+        option: str,
+        fallback_font: pygame.font.Font,
+    ) -> pygame.font.Font:
+        if self.option_font_getter is None:
+            return fallback_font
+        try:
+            preview_font = self.option_font_getter(option, fallback_font)
+            if preview_font is not None:
+                return preview_font
+        except Exception:
+            pass
+        return fallback_font
 
     def draw(
         self,
@@ -148,7 +164,8 @@ class Dropdown:
         pygame.draw.rect(surface, (248, 243, 232), rect, border_radius=10)
         pygame.draw.rect(surface, border, rect, width=2, border_radius=10)
         label = self.value
-        text = font.render(label, True, INK)
+        label_font = self.font_for_option(label, font)
+        text = label_font.render(label, True, INK)
         surface.blit(text, (rect.x + 12, rect.y + (rect.height - text.get_height()) // 2))
 
         caret = "▴" if self.open else "▾"
@@ -194,7 +211,8 @@ class Dropdown:
             hovered = option_rect.collidepoint(mouse_pos)
             if hovered or option == self.value:
                 pygame.draw.rect(surface, PARCHMENT_DARK, option_rect, border_radius=8)
-            option_text = font.render(option, True, INK)
+            option_font = self.font_for_option(option, font)
+            option_text = option_font.render(option, True, INK)
             surface.blit(
                 option_text,
                 (
@@ -434,6 +452,7 @@ class GeneratorApp:
                 self.bg_original = None
         self.bg_cache: pygame.Surface | None = None
         self.bg_cache_size: tuple[int, int] | None = None
+        self.font_preview_cache: dict[tuple[str, int], pygame.font.Font] = {}
 
         self.class_dropdown = Dropdown(
             ["Random", *[pretty_label(name) for name in Classes.entries]],
@@ -455,7 +474,11 @@ class GeneratorApp:
             max_length=2,
             numeric_only=True,
         )
-        self.font_dropdown = Dropdown(["Random", *list(character.AVAILABLE_FONTS.keys())], "Random")
+        self.font_dropdown = Dropdown(
+            ["Random", *list(character.AVAILABLE_FONTS.keys())],
+            "Random",
+            option_font_getter=self.get_font_preview,
+        )
         self.balance_box = CheckBox("Build a balanced party", False)
         self.spellbook_box = CheckBox("Generate spellbook pages", False)
 
@@ -481,6 +504,30 @@ class GeneratorApp:
         except Exception:
             pass
         return pygame.font.SysFont("serif", size)
+
+    def get_font_preview(
+        self,
+        option: str,
+        fallback_font: pygame.font.Font,
+    ) -> pygame.font.Font:
+        font_key = option.strip().lower()
+        if font_key == "random":
+            return fallback_font
+
+        preview_size = max(12, fallback_font.get_height())
+        cache_key = (font_key, preview_size)
+        cached_font = self.font_preview_cache.get(cache_key)
+        if cached_font is not None:
+            return cached_font
+
+        try:
+            font_path = character.download_font(font_key)
+            preview_font = pygame.font.Font(font_path, preview_size)
+        except Exception:
+            preview_font = fallback_font
+
+        self.font_preview_cache[cache_key] = preview_font
+        return preview_font
 
     def close_dropdowns(self, except_for: Dropdown | None = None) -> None:
         for dropdown in (self.class_dropdown, self.species_dropdown, self.font_dropdown):
