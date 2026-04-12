@@ -45,7 +45,7 @@ GUI_DIR = BASE_DIR / "GUI"
 BACKGROUND_PATH = GUI_DIR / "parchment_bg.jpg"
 FONT_PATH = GUI_DIR / "Cinzel-Regular.ttf"
 
-WINDOW_TITLE = "The Fellowship Forge"
+WINDOW_TITLE = "Delgado's Character Generator"
 DEFAULT_SIZE = (1160, 780)
 MIN_SIZE = (960, 680)
 FPS = 60
@@ -465,12 +465,12 @@ class GeneratorApp:
 
         self.output_rect = pygame.Rect(0, 0, 0, 0)
         self.scroll_offset = 0
-        self.status_message = "Select your options, then forge a new adventurer."
+        self.status_message = "Select your options, then generate PDFs."
         self.output_text = (
-            "Welcome to The Fellowship Forge.\n\n"
-            "Choose a level, party size, optional class/species anchors, and whether "
+            "Welcome to Delgado's Character Generator!\n\n"
+            "Choose a level, number of characters to generate, class, species, and whether "
             "you want party balancing or spellbooks. Generated PDFs are saved next to "
-            "main.py in this project folder."
+            "main.pyw in this project folder."
         )
 
     def get_font(self, size: int | float) -> pygame.font.Font:
@@ -733,7 +733,7 @@ class GeneratorApp:
         self.output_rect = rect
         self.draw_panel(rect)
 
-        draw_text(self.screen, "Chronicle", title_font, INK, (rect.x + 16, rect.y + 12), shadow=False)
+        draw_text(self.screen, "Codex", title_font, INK, (rect.x + 16, rect.y + 12), shadow=False)
         content_rect = pygame.Rect(rect.x + 16, rect.y + 48, rect.width - 32, rect.height - 62)
 
         lines = wrap_text(self.output_text, body_font, content_rect.width - 14)
@@ -785,7 +785,7 @@ class GeneratorApp:
         draw_text(self.screen, WINDOW_TITLE, title_font, INK, (banner_rect.x + 18, banner_rect.y + 14), shadow=True)
         draw_text(
             self.screen,
-            "A fantasy-themed D&D 5e character sheet forge",
+            "A fantasy-themed D&D 5e character sheet generator",
             subtitle_font,
             FOREST,
             (banner_rect.x + 20, banner_rect.y + 52),
