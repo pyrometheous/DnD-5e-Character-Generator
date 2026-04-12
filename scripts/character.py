@@ -1498,6 +1498,9 @@ class Character:
         apply_custom_font(output_pdf_filename, font_name,
                           expertise_skills=self.expertise_skills)
 
+        if self.char_class not in SPELLCASTING_ABILITY:
+            remove_spell_sheet_page(output_pdf_filename)
+
         print(f"Character sheet saved to: {output_pdf_filename}")
         return
 
@@ -1658,6 +1661,23 @@ def apply_spellbook_fields(fields, spellbook):
 
         for field_name, spell in zip(available_fields, spells):
             fields[field_name] = spell['name']
+
+
+def remove_spell_sheet_page(pdf_path):
+    """Remove page 3 spell sheet for non-spellcaster output files."""
+    temp_path = f"{pdf_path}.tmp"
+    wrote_temp = False
+    doc = fitz.open(pdf_path)
+    try:
+        if len(doc) >= 3:
+            doc.delete_page(2)
+            doc.save(temp_path)
+            wrote_temp = True
+    finally:
+        doc.close()
+
+    if wrote_temp:
+        os.replace(temp_path, pdf_path)
 
 
 def apply_custom_font(pdf_path, font_name, expertise_skills=None):
