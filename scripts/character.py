@@ -534,6 +534,8 @@ class Character:
         self.feature_annotations = {}
         self.bonus_features_by_level = {}
         self.class_feature_choices = []
+        self.class_specific_by_level = {}
+        self.class_specific_current = {}
         self.progression_built_to_level = 0
         self.applied_subclass_feature_levels = set()
         self.spellcasting_profile = None
@@ -847,6 +849,20 @@ class Character:
             notes.append(f"{feature_name}: {', '.join(choice_names)}.")
 
         return notes
+
+    def _split_feature_trait_lines(self, lines, first_page_max_lines=30):
+        """Split one feature/trait stream into page 1 then page 2 continuation."""
+        if len(lines) <= first_page_max_lines:
+            return lines, []
+
+        page_one = list(lines[:first_page_max_lines])
+        page_two = list(lines[first_page_max_lines:])
+
+        # Avoid awkward duplicate blank boundary when splitting.
+        while page_one and page_two and page_one[-1] == '' and page_two[0] == '':
+            page_two.pop(0)
+
+        return page_one, page_two
 
     def get_traits(self):
         species_key = self.species.lower()
@@ -1369,15 +1385,21 @@ class Character:
 
         # Features and Traits (ASI entries include parenthetical ability notes)
         features = self.get_features_annotated()
-        fields['Features and Traits'] = '\n'.join(features)
-        trait_lines = list(traits)
+        all_feature_trait_lines = list(features)
+        if traits:
+            all_feature_trait_lines.extend([''] + list(traits))
+
         progression_notes = self._progression_notes()
         if progression_notes:
-            trait_lines.extend([''] + progression_notes)
+            all_feature_trait_lines.extend([''] + progression_notes)
+
         spellcaster_notes = self._spellcaster_notes(prof_bonus, spellbook=spellbook)
         if spellcaster_notes:
-            trait_lines.extend([''] + spellcaster_notes)
-        fields['Feat+Traits'] = '\n'.join(trait_lines)
+            all_feature_trait_lines.extend([''] + spellcaster_notes)
+
+        page_one_lines, page_two_lines = self._split_feature_trait_lines(all_feature_trait_lines)
+        fields['Features and Traits'] = '\n'.join(page_one_lines)
+        fields['Feat+Traits'] = '\n'.join(page_two_lines)
 
         # Weapon attacks (populate first weapon slot from equipment if applicable)
         weapon_equipped = False

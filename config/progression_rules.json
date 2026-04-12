@@ -19,11 +19,23 @@
     ]
   },
   "subclass_selection": {
+    "barbarian": {
+      "berserker": 1.0
+    },
+    "bard": {
+      "lore": 1.0
+    },
     "cleric": {
       "life": 1.0
     },
+    "druid": {
+      "land": 1.0
+    },
     "fighter": {
       "champion": 1.0
+    },
+    "monk": {
+      "open-hand": 1.0
     },
     "paladin": {
       "devotion": 1.0
@@ -31,11 +43,17 @@
     "ranger": {
       "hunter": 1.0
     },
+    "rogue": {
+      "thief": 1.0
+    },
     "sorcerer": {
       "draconic": 1.0
     },
     "warlock": {
       "fiend": 1.0
+    },
+    "wizard": {
+      "evocation": 1.0
     }
   },
   "feature_selection": {
@@ -225,6 +243,58 @@
     }
   },
   "subclass_fallbacks": {
+    "barbarian": {
+      "berserker": {
+        "name": "Path of the Berserker",
+        "features_by_level": {
+          "3": [
+            {
+              "name": "Frenzy"
+            }
+          ],
+          "6": [
+            {
+              "name": "Mindless Rage"
+            }
+          ],
+          "10": [
+            {
+              "name": "Intimidating Presence"
+            }
+          ],
+          "14": [
+            {
+              "name": "Retaliation"
+            }
+          ]
+        }
+      }
+    },
+    "bard": {
+      "lore": {
+        "name": "College of Lore",
+        "features_by_level": {
+          "3": [
+            {
+              "name": "Bonus Proficiencies"
+            },
+            {
+              "name": "Cutting Words"
+            }
+          ],
+          "6": [
+            {
+              "name": "Additional Magical Secrets"
+            }
+          ],
+          "14": [
+            {
+              "name": "Peerless Skill"
+            }
+          ]
+        }
+      }
+    },
     "cleric": {
       "life": {
         "name": "Life Domain",
@@ -265,6 +335,41 @@
         }
       }
     },
+    "druid": {
+      "land": {
+        "name": "Circle of the Land",
+        "choice_features_by_level": {
+          "2": [
+            "circle-of-the-land"
+          ]
+        },
+        "features_by_level": {
+          "2": [
+            {
+              "name": "Bonus Cantrip"
+            },
+            {
+              "name": "Natural Recovery"
+            }
+          ],
+          "6": [
+            {
+              "name": "Land's Stride"
+            }
+          ],
+          "10": [
+            {
+              "name": "Nature's Ward"
+            }
+          ],
+          "14": [
+            {
+              "name": "Nature's Sanctuary"
+            }
+          ]
+        }
+      }
+    },
     "fighter": {
       "champion": {
         "name": "Champion",
@@ -292,6 +397,33 @@
           "18": [
             {
               "name": "Survivor"
+            }
+          ]
+        }
+      }
+    },
+    "monk": {
+      "open-hand": {
+        "name": "Way of the Open Hand",
+        "features_by_level": {
+          "3": [
+            {
+              "name": "Open Hand Technique"
+            }
+          ],
+          "6": [
+            {
+              "name": "Wholeness of Body"
+            }
+          ],
+          "11": [
+            {
+              "name": "Tranquility"
+            }
+          ],
+          "17": [
+            {
+              "name": "Quivering Palm"
             }
           ]
         }
@@ -342,6 +474,36 @@
           ],
           "15": [
             "superior-hunters-defense"
+          ]
+        }
+      }
+    },
+    "rogue": {
+      "thief": {
+        "name": "Thief",
+        "features_by_level": {
+          "3": [
+            {
+              "name": "Fast Hands"
+            },
+            {
+              "name": "Second-Story Work"
+            }
+          ],
+          "9": [
+            {
+              "name": "Supreme Sneak"
+            }
+          ],
+          "13": [
+            {
+              "name": "Use Magic Device"
+            }
+          ],
+          "17": [
+            {
+              "name": "Thief's Reflexes"
+            }
           ]
         }
       }
@@ -404,6 +566,36 @@
           "14": [
             {
               "name": "Hurl Through Hell"
+            }
+          ]
+        }
+      }
+    },
+    "wizard": {
+      "evocation": {
+        "name": "School of Evocation",
+        "features_by_level": {
+          "2": [
+            {
+              "name": "Evocation Savant"
+            },
+            {
+              "name": "Sculpt Spells"
+            }
+          ],
+          "6": [
+            {
+              "name": "Potent Cantrip"
+            }
+          ],
+          "10": [
+            {
+              "name": "Empowered Evocation"
+            }
+          ],
+          "14": [
+            {
+              "name": "Overchannel"
             }
           ]
         }
