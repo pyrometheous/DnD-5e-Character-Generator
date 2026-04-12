@@ -10,7 +10,10 @@ A toolkit for generating random, rules-legal D&D 5th Edition characters (levels 
 - [GUI assets and credits](docs/GUI_ASSETS.md)
 
 ## Disclaimer
-I got a little excited and felt like this was finished earlier, but as of right now, I'm re-working a lot of stuff and I wouldn't say this is in a finished state. Your milage may vary. Major refactor is incoming.
+
+I'm in no way affiliated with Wizard of the Coast or Dungeons and Dragons. This is a hobby project. The character sheets are downloaded from an official source upon character creation, and I do not own that file. In the future, I may setup my own character sheets to avoid confusion.
+
+Spell cards work, but they're not the prettiest yet, revisions will happen at some point, but I don't know when. Core functionality should be completed though.
 
 
 ## Setup
