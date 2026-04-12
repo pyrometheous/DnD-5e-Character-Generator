@@ -87,6 +87,15 @@ SPELL_SLOT_FIELD_MAP = {
     9: 'SlotsTotal 27',
 }
 
+# Feature indices that grant Expertise (double proficiency on chosen skills)
+# and how many skill choices each grants.
+EXPERTISE_FEATURE_INDICES = {
+    'rogue-expertise-1': 2,
+    'rogue-expertise-2': 2,
+    'bard-expertise-1': 2,
+    'bard-expertise-2': 2,
+}
+
 AVAILABLE_FONTS = {
     'cinzel':        {'css': 'Cinzel:wght@400;700',         'desc': 'Elegant serif, great readability'},
     'medievalsharp': {'css': 'MedievalSharp',                'desc': 'Whimsical medieval script'},
@@ -119,6 +128,10 @@ class Character:
         char_class_attribute = getattr(Classes, self.char_class)
         self.hit_die = f'd{char_class_attribute.hit_die}'
         self.skill_proficiencies = []
+        self.expertise_skills = []    # skills with doubled proficiency bonus
+        self.jack_of_all_trades = False  # bard: half prof on non-proficient skills
+        self.extra_languages = []        # from racial language choices
+        self.asi_log = []                # track each ASI taken {ability: bonus}
         self.proficiencies = []
         self.equipment = []
         self.saving_throw_proficiencies = [
@@ -144,6 +157,23 @@ class Character:
                 features.append(feat['name'])
         return features
 
+    def get_features_annotated(self):
+        """Return features list with ASI entries annotated with which abilities improved."""
+        features = []
+        asi_index = 0
+        for lvl in range(1, self.level + 1):
+            level_data = getattr(Levels, f"{self.char_class}_{lvl}")
+            for feat in level_data.features:
+                name = feat['name']
+                if name == 'Ability Score Improvement' and asi_index < len(self.asi_log):
+                    record = self.asi_log[asi_index]
+                    parts = [f"+{v} {k[:3].upper()}" for k, v in record.items() if v > 0]
+                    if parts:
+                        name = f"Ability Score Improvement ({', '.join(parts)})"
+                    asi_index += 1
+                features.append(name)
+        return features
+
     def get_speed(self):
         species_key = self.species.lower()
         race_data = getattr(Species, species_key)
@@ -152,7 +182,12 @@ class Character:
     def get_languages(self):
         species_key = self.species.lower()
         race_data = getattr(Species, species_key)
-        return [lang['name'] for lang in race_data.languages]
+        languages = [lang['name'] for lang in race_data.languages]
+        languages.extend(self.extra_languages)
+        # Rogues learn Thieves' Cant as a secret language at level 1
+        if "Thieves' Cant" in self.get_features() and "Thieves' Cant" not in languages:
+            languages.append("Thieves' Cant")
+        return languages
 
     def get_traits(self):
         species_key = self.species.lower()
@@ -169,16 +204,19 @@ class Character:
 
     def apply_asi(self):
         num_asi = self.ability_score_improvements()
+        abilities = ['strength', 'dexterity', 'constitution',
+                     'intelligence', 'wisdom', 'charisma']
         for _ in range(num_asi):
             # Each ASI gives +2 total, typically +2 to one or +1 to two
             # Randomly boost two different abilities by +1 each
-            abilities = ['strength', 'dexterity', 'constitution',
-                         'intelligence', 'wisdom', 'charisma']
             chosen = random.sample(abilities, 2)
+            asi_record = {}
             for ability in chosen:
                 current = getattr(self, ability)
                 if current < 20:
                     setattr(self, ability, current + 1)
+                    asi_record[ability] = 1
+            self.asi_log.append(asi_record)
 
     def choose_skill_proficiencies(self):
         cls = getattr(Classes, self.char_class)
@@ -200,9 +238,67 @@ class Character:
         ability = skill_info['ability']
         ability_score = getattr(self, ability)
         mod = modifier(ability_score)
-        if skill_name in self.skill_proficiencies:
-            mod += self.proficiency_bonus()
+        prof = self.proficiency_bonus()
+        if skill_name in self.expertise_skills:
+            mod += prof * 2
+        elif skill_name in self.skill_proficiencies:
+            mod += prof
+        elif self.jack_of_all_trades:
+            # Half proficiency bonus (floor) on non-proficient skills
+            mod += prof // 2
         return mod
+
+    def choose_expertise(self):
+        """Randomly assign Expertise skills from existing skill proficiencies."""
+        for lvl in range(1, self.level + 1):
+            level_data = getattr(Levels, f"{self.char_class}_{lvl}")
+            for feat in level_data.features:
+                feat_index = feat.get('index', '')
+                if feat_index in EXPERTISE_FEATURE_INDICES:
+                    num_pick = EXPERTISE_FEATURE_INDICES[feat_index]
+                    eligible = [s for s in self.skill_proficiencies
+                                if s not in self.expertise_skills]
+                    num_pick = min(num_pick, len(eligible))
+                    if num_pick > 0:
+                        self.expertise_skills.extend(
+                            random.sample(eligible, num_pick)
+                        )
+
+    def apply_jack_of_all_trades(self):
+        """Set the JOAT flag if the character has the Jack of All Trades feature."""
+        self.jack_of_all_trades = 'Jack of All Trades' in self.get_features()
+
+    def choose_racial_options(self):
+        """Pick additional languages and proficiencies granted by racial traits."""
+        species_key = self.species.lower()
+        race_data = getattr(Species, species_key)
+
+        # Extra language choices (Human: +1, Half-Elf: +1)
+        if hasattr(race_data, 'language_options') and race_data.language_options:
+            lang_opts = race_data.language_options
+            options = lang_opts['from']['options']
+            num_choose = min(lang_opts['choose'], len(options))
+            chosen = random.sample(options, num_choose)
+            for opt in chosen:
+                lang_name = opt['item']['name']
+                if lang_name not in self.extra_languages:
+                    self.extra_languages.append(lang_name)
+
+        # Extra proficiency choices (Dwarf: artisan tool, Half-Elf: 2 skills)
+        if hasattr(race_data, 'starting_proficiency_options') and race_data.starting_proficiency_options:
+            prof_opts = race_data.starting_proficiency_options
+            options = prof_opts['from']['options']
+            num_choose = min(prof_opts['choose'], len(options))
+            chosen = random.sample(options, num_choose)
+            for opt in chosen:
+                prof_name = opt['item']['name']
+                if prof_name.startswith('Skill: '):
+                    skill_name = prof_name.replace('Skill: ', '')
+                    if skill_name not in self.skill_proficiencies:
+                        self.skill_proficiencies.append(skill_name)
+                else:
+                    if prof_name not in self.proficiencies:
+                        self.proficiencies.append(prof_name)
 
     def populate_proficiencies(self):
         """Add class armor/weapon/tool proficiencies and racial proficiencies."""
@@ -232,6 +328,9 @@ class Character:
         self.apply_racial_bonuses()
         self.choose_skill_proficiencies()
         self.populate_proficiencies()
+        self.choose_racial_options()        # racial language & proficiency picks
+        self.choose_expertise()             # Expertise from class features
+        self.apply_jack_of_all_trades()     # JOAT half-prof flag
         self.apply_asi()
         self.hp = hp(level=self.level, constitution=self.constitution,
                      hit_die=self.hit_die)
@@ -359,8 +458,8 @@ class Character:
             prof_lines.append(f'  {lang}')
         fields['ProficienciesLang'] = '\n'.join(prof_lines)
 
-        # Features and Traits
-        features = self.get_features()
+        # Features and Traits (ASI entries include parenthetical ability notes)
+        features = self.get_features_annotated()
         fields['Features and Traits'] = '\n'.join(features)
         fields['Feat+Traits'] = '\n'.join(traits)
 
@@ -405,7 +504,8 @@ class Character:
 
         if font_name is None:
             font_name = random.choice(list(AVAILABLE_FONTS.keys()))
-        apply_custom_font(output_pdf_filename, font_name)
+        apply_custom_font(output_pdf_filename, font_name,
+                          expertise_skills=self.expertise_skills)
 
         print(f"Character sheet saved to: {output_pdf_filename}")
         return
@@ -569,10 +669,22 @@ def apply_spellbook_fields(fields, spellbook):
             fields[field_name] = spell['name']
 
 
-def apply_custom_font(pdf_path, font_name):
-    """Replace form field text with custom-font rendered text via pymupdf."""
+def apply_custom_font(pdf_path, font_name, expertise_skills=None):
+    """Replace form field text with custom-font rendered text via pymupdf.
+
+    expertise_skills: iterable of skill names (keys in SKILLS) that have
+    Expertise.  An "E" is rendered just left of each matching proficiency
+    checkbox on the character sheet.
+    """
     font_path = download_font(font_name)
     font_obj = fitz.Font(fontfile=font_path)
+
+    # Build the set of checkbox field names for expertise-marked skills
+    expertise_cbs = set()
+    if expertise_skills:
+        for sname in expertise_skills:
+            if sname in SKILLS:
+                expertise_cbs.add(SKILLS[sname]['checkbox'])
 
     # The official WotC character sheet emits noisy, non-fatal MuPDF
     # diagnostics ("argument error: not a dict (string)") whenever we
@@ -582,11 +694,14 @@ def apply_custom_font(pdf_path, font_name):
     previous_warning_state = fitz.TOOLS.mupdf_display_warnings(False)
 
     try:
-        # Collect all filled widget data across all pages
+        # Collect all filled widget data across all pages; also record
+        # the checkbox rect for every expertise-marked skill.
         doc = fitz.open(pdf_path)
         all_page_data = []
+        expertise_cb_rects = {}   # page_num -> {field_name: fitz.Rect}
         for page in doc:
             widgets_data = []
+            cb_rects_on_page = {}
             for w in page.widgets():
                 if w.field_type == fitz.PDF_WIDGET_TYPE_TEXT and w.field_value:
                     widgets_data.append({
@@ -594,14 +709,19 @@ def apply_custom_font(pdf_path, font_name):
                         'value': str(w.field_value),
                         'rect': w.rect,
                     })
+                elif w.field_name in expertise_cbs:
+                    cb_rects_on_page[w.field_name] = w.rect
             all_page_data.append(widgets_data)
+            if cb_rects_on_page:
+                expertise_cb_rects[page.number] = cb_rects_on_page
         doc.close()
 
         # Process one page at a time, saving and reopening between pages
         # to avoid cross-page widget corruption
         for page_num in range(len(all_page_data)):
             widgets_data = all_page_data[page_num]
-            if not widgets_data:
+            page_cb_rects = expertise_cb_rects.get(page_num, {})
+            if not widgets_data and not page_cb_rects:
                 continue
 
             doc = fitz.open(pdf_path)
@@ -674,6 +794,18 @@ def apply_custom_font(pdf_path, font_name):
                     fitz.Point(x, y), value,
                     fontname="custom", fontfile=font_path,
                     fontsize=fontsize,
+                )
+
+            # Overlay "E" to the left of each expertise skill checkbox
+            for cb_rect in page_cb_rects.values():
+                e_size = cb_rect.height * 0.85
+                text_w = font_obj.text_length("E", fontsize=e_size)
+                ex = cb_rect.x0 - text_w - 1
+                ey = cb_rect.y0 + (cb_rect.height + e_size) / 2 - 1
+                page.insert_text(
+                    fitz.Point(ex, ey), "E",
+                    fontname="custom", fontfile=font_path,
+                    fontsize=e_size,
                 )
 
             # Save this page's changes before processing the next page
