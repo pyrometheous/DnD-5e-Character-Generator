@@ -135,6 +135,7 @@ class Dropdown:
         self.open = False
         self.scroll_index = 0
         self.max_visible = 9
+        self.visible_count = self.max_visible
 
     def font_for_option(
         self,
@@ -191,21 +192,46 @@ class Dropdown:
 
         rect = self.rect
         option_height = rect.height
-        visible_count = min(len(self.options), self.max_visible)
+
+        view_height = surface.get_height()
+        below_space = max(0, view_height - (rect.bottom + 8))
+        above_space = max(0, rect.y - 8)
+        max_below = max(1, min(self.max_visible, below_space // option_height))
+        max_above = max(1, min(self.max_visible, above_space // option_height))
+
+        required_visible = min(len(self.options), self.max_visible)
+        can_fit_below = below_space >= required_visible * option_height
+        can_fit_above = above_space >= required_visible * option_height
+
+        open_upward = False
+        if can_fit_above and not can_fit_below:
+            open_upward = True
+        elif not can_fit_below and above_space > below_space:
+            open_upward = True
+
+        if open_upward:
+            visible_count = min(len(self.options), max_above)
+        else:
+            visible_count = min(len(self.options), max_below)
+
+        self.visible_count = visible_count
         max_scroll = max(0, len(self.options) - visible_count)
         self.scroll_index = int(clamp(self.scroll_index, 0, max_scroll))
         visible_options = self.options[self.scroll_index:self.scroll_index + visible_count]
 
         drop_height = visible_count * option_height
-        self.drop_rect = pygame.Rect(rect.x, rect.bottom + 4, rect.width, drop_height)
+        drop_y = rect.bottom + 4
+        if open_upward:
+            drop_y = rect.y - 4 - drop_height
+        self.drop_rect = pygame.Rect(rect.x, drop_y, rect.width, drop_height)
         pygame.draw.rect(surface, (247, 240, 226), self.drop_rect, border_radius=10)
         pygame.draw.rect(surface, GOLD, self.drop_rect, width=2, border_radius=10)
 
         for index, option in enumerate(visible_options):
             option_rect = pygame.Rect(
-                rect.x + 4,
-                rect.bottom + 6 + index * option_height,
-                rect.width - 8,
+                self.drop_rect.x + 4,
+                self.drop_rect.y + 2 + index * option_height,
+                self.drop_rect.width - 8,
                 option_height - 2,
             )
             hovered = option_rect.collidepoint(mouse_pos)
@@ -246,7 +272,7 @@ class Dropdown:
         if event.type == pygame.MOUSEWHEEL and self.open:
             mouse_pos = pygame.mouse.get_pos()
             if self.drop_rect.collidepoint(mouse_pos) or self.rect.collidepoint(mouse_pos):
-                visible_count = min(len(self.options), self.max_visible)
+                visible_count = min(len(self.options), self.visible_count)
                 max_scroll = max(0, len(self.options) - visible_count)
                 self.scroll_index = int(clamp(self.scroll_index - event.y, 0, max_scroll))
                 return True
@@ -454,19 +480,17 @@ class GeneratorApp:
         self.bg_cache_size: tuple[int, int] | None = None
         self.font_preview_cache: dict[tuple[str, int], pygame.font.Font] = {}
 
-        self.class_dropdown = Dropdown(
-            ["Random", *[pretty_label(name) for name in Classes.entries]],
+        self.class_chips = [
+            ToggleChip(pretty_label(name), name)
+            for name in Classes.entries
+        ]
+        self.species_chips = [
+            ToggleChip(pretty_label(name.capitalize()), name.capitalize())
+            for name in Species.entries
+        ]
+        self.level_dropdown = Dropdown(
+            ["Random", *[str(level) for level in range(1, 21)]],
             "Random",
-        )
-        self.species_dropdown = Dropdown(
-            ["Random", *[pretty_label(name.capitalize()) for name in Species.entries]],
-            "Random",
-        )
-        self.level_input = TextInput(
-            text="",
-            placeholder="blank = random",
-            max_length=2,
-            numeric_only=True,
         )
         self.count_input = TextInput(
             text="1",
@@ -481,20 +505,29 @@ class GeneratorApp:
         )
         self.balance_box = CheckBox("Build a balanced party", False)
         self.spellbook_box = CheckBox("Generate spellbook pages", False)
+        self.spellcards_box = CheckBox("Append spell cards", False)
 
         self.generate_button = ActionButton("Generate PDFs", accent=True)
         self.clear_button = ActionButton("Clear Filters")
         self.open_button = ActionButton("Open Output Folder")
 
+        self.forge_rect = pygame.Rect(0, 0, 0, 0)
+        self.forge_content_rect = pygame.Rect(0, 0, 0, 0)
+        self.forge_footer_rect = pygame.Rect(0, 0, 0, 0)
+        self.forge_scroll_offset = 0
         self.output_rect = pygame.Rect(0, 0, 0, 0)
         self.scroll_offset = 0
         self.status_message = "Select your options, then generate PDFs."
-        self.output_text = (
+        self.default_output_text = (
             "Welcome to Delgado's Character Generator!\n\n"
-            "Choose a level, number of characters to generate, class, species, and whether "
-            "you want party balancing or spellbooks. Generated PDFs are saved next to "
-            "main.pyw in this project folder."
+            "How this works:\n"
+            "- Select zero or more class and species preference chips (none selected = random).\n"
+            "- Select a level (or Random) and number of characters.\n"
+            "- Enable party balance, spellbook output, and/or spell cards as needed.\n"
+            "- Spell cards use your selected PDF font.\n\n"
+            "Generated PDFs are saved next to main.pyw in this project folder."
         )
+        self.output_text = self.default_output_text
 
     def get_font(self, size: int | float) -> pygame.font.Font:
         size = int(clamp(size, 12, 40))
@@ -530,36 +563,29 @@ class GeneratorApp:
         return preview_font
 
     def close_dropdowns(self, except_for: Dropdown | None = None) -> None:
-        for dropdown in (self.class_dropdown, self.species_dropdown, self.font_dropdown):
+        for dropdown in (self.level_dropdown, self.font_dropdown):
             if dropdown is not except_for:
                 dropdown.open = False
 
     def active_classes(self) -> list[str]:
-        selected = self.class_dropdown.value.strip().lower().replace(" ", "_")
-        if selected == "random":
-            return []
-        for class_name in Classes.entries:
-            if class_name.lower() == selected:
-                return [class_name]
-        return []
+        return [chip.value for chip in self.class_chips if chip.selected]
 
     def active_species(self) -> list[str]:
-        selected = self.species_dropdown.value.strip().lower().replace(" ", "_")
-        if selected == "random":
-            return []
-        for species_name in Species.entries:
-            if species_name.lower() == selected:
-                return [species_name.capitalize()]
-        return []
+        return [chip.value for chip in self.species_chips if chip.selected]
 
     def clear_filters(self) -> None:
-        self.class_dropdown.value = "Random"
-        self.species_dropdown.value = "Random"
-        self.level_input.text = ""
+        for chip in self.class_chips:
+            chip.selected = False
+        for chip in self.species_chips:
+            chip.selected = False
+        self.level_dropdown.value = "Random"
         self.count_input.text = "1"
         self.font_dropdown.value = "Random"
         self.balance_box.checked = False
         self.spellbook_box.checked = False
+        self.spellcards_box.checked = False
+        self.output_text = self.default_output_text
+        self.scroll_offset = 0
         self.status_message = "Filters cleared."
 
     def get_background(self, size: tuple[int, int]) -> pygame.Surface:
@@ -616,15 +642,13 @@ class GeneratorApp:
 
         selected_classes = self.active_classes()
         selected_species = self.active_species()
-        level_text = self.level_input.text.strip()
+        level_value = self.level_dropdown.value.strip()
         count_text = self.count_input.text.strip()
 
-        requested_level = None if not level_text else int(level_text)
+        requested_level = None if level_value == "Random" else int(level_value)
         requested_count = int(count_text or "1")
         requested_font = None if self.font_dropdown.value == "Random" else self.font_dropdown.value
 
-        if requested_level is not None and not 1 <= requested_level <= 20:
-            raise ValueError("Level must be between 1 and 20.")
         if requested_count < 1:
             raise ValueError("Number of characters must be at least 1.")
 
@@ -645,16 +669,21 @@ class GeneratorApp:
                     output_chunks.append(self.describe_character(char_obj))
 
                     spellbook = None
-                    if self.spellbook_box.checked:
+                    should_generate_spellbook = self.spellbook_box.checked or self.spellcards_box.checked
+                    if should_generate_spellbook:
                         spellbook = build_spellbook_for_character(char_obj)
                         if spellbook is None:
                             output_chunks.append(
                                 f"{char_obj.name} the {char_obj.char_class.capitalize()} does not have a class spellbook to generate."
                             )
-                        else:
+                        elif self.spellbook_box.checked:
                             output_chunks.append(format_spellbook(spellbook))
 
-                    char_obj.create_pdf_file(font_name=requested_font, spellbook=spellbook)
+                    char_obj.create_pdf_file(
+                        font_name=requested_font,
+                        spellbook=spellbook,
+                        spellcards=self.spellcards_box.checked,
+                    )
                     output_chunks.append(
                         f"Saved PDF: {char_obj.name.replace(' ', '_')}_Character_Sheet.pdf"
                     )
@@ -669,16 +698,21 @@ class GeneratorApp:
                     output_chunks.append(self.describe_character(char_obj))
 
                     spellbook = None
-                    if self.spellbook_box.checked:
+                    should_generate_spellbook = self.spellbook_box.checked or self.spellcards_box.checked
+                    if should_generate_spellbook:
                         spellbook = build_spellbook_for_character(char_obj)
                         if spellbook is None:
                             output_chunks.append(
                                 f"{char_obj.name} the {char_obj.char_class.capitalize()} does not have a class spellbook to generate."
                             )
-                        else:
+                        elif self.spellbook_box.checked:
                             output_chunks.append(format_spellbook(spellbook))
 
-                    char_obj.create_pdf_file(font_name=requested_font, spellbook=spellbook)
+                    char_obj.create_pdf_file(
+                        font_name=requested_font,
+                        spellbook=spellbook,
+                        spellcards=self.spellcards_box.checked,
+                    )
                     output_chunks.append(
                         f"Saved PDF: {char_obj.name.replace(' ', '_')}_Character_Sheet.pdf"
                     )
@@ -703,15 +737,19 @@ class GeneratorApp:
             self.screen = pygame.display.set_mode(new_size, pygame.RESIZABLE)
             return
 
-        for dropdown in (self.class_dropdown, self.species_dropdown, self.font_dropdown):
+        for dropdown in (self.level_dropdown, self.font_dropdown):
             if dropdown.handle_event(event):
                 self.close_dropdowns(dropdown if dropdown.open else None)
                 return
 
-        if self.level_input.handle_event(event):
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                self.close_dropdowns()
+        if self.level_dropdown.open or self.font_dropdown.open:
             return
+
+        for chip in (*self.class_chips, *self.species_chips):
+            if chip.handle_event(event):
+                self.close_dropdowns()
+                return
+
         if self.count_input.handle_event(event):
             if event.type == pygame.MOUSEBUTTONDOWN:
                 self.close_dropdowns()
@@ -723,6 +761,8 @@ class GeneratorApp:
         if self.balance_box.handle_event(event):
             return
         if self.spellbook_box.handle_event(event):
+            return
+        if self.spellcards_box.handle_event(event):
             return
 
         if self.generate_button.handle_event(event):
@@ -742,11 +782,18 @@ class GeneratorApp:
         if event.type == pygame.MOUSEWHEEL:
             if self.output_rect.collidepoint(pygame.mouse.get_pos()):
                 self.scroll_offset = max(0, self.scroll_offset - event.y * 34)
+            elif self.forge_content_rect.collidepoint(pygame.mouse.get_pos()):
+                self.forge_scroll_offset = max(0, self.forge_scroll_offset - event.y * 34)
         elif event.type == pygame.MOUSEBUTTONDOWN and self.output_rect.collidepoint(event.pos):
             if event.button == 4:
                 self.scroll_offset = max(0, self.scroll_offset - 34)
             elif event.button == 5:
                 self.scroll_offset += 34
+        elif event.type == pygame.MOUSEBUTTONDOWN and self.forge_content_rect.collidepoint(event.pos):
+            if event.button == 4:
+                self.forge_scroll_offset = max(0, self.forge_scroll_offset - 34)
+            elif event.button == 5:
+                self.forge_scroll_offset += 34
 
     def draw_chip_group(
         self,
@@ -853,10 +900,30 @@ class GeneratorApp:
         right_rect = pygame.Rect(left_rect.right + gutter, content_y, width - left_rect.width - margin * 2 - gutter, content_height)
 
         self.draw_panel(left_rect)
+        self.forge_rect = left_rect
 
-        x = left_rect.x + 16
-        y = left_rect.y + 14
-        control_width = left_rect.width - 32
+        button_gap = 10
+        button_height = max(42, int(height * 0.058))
+        footer_height = button_height * 2 + button_gap + 16
+        self.forge_footer_rect = pygame.Rect(
+            left_rect.x + 16,
+            left_rect.bottom - footer_height - 14,
+            left_rect.width - 32,
+            footer_height,
+        )
+        self.forge_content_rect = pygame.Rect(
+            left_rect.x + 16,
+            left_rect.y + 14,
+            left_rect.width - 32,
+            self.forge_footer_rect.y - left_rect.y - 44,
+        )
+
+        previous_clip = self.screen.get_clip()
+        self.screen.set_clip(self.forge_content_rect)
+
+        x = self.forge_content_rect.x
+        y = self.forge_content_rect.y - self.forge_scroll_offset
+        control_width = self.forge_content_rect.width
         control_height = max(38, int(height * 0.055))
         field_gap = 12
         half_width = (control_width - field_gap) // 2
@@ -864,31 +931,34 @@ class GeneratorApp:
         draw_text(self.screen, "Forge Settings", section_font, INK, (x, y), shadow=False)
         y += 30
 
-        label = small_font.render("Class", True, INK_SOFT)
+        label = small_font.render("Class Preferences (none = random)", True, INK_SOFT)
         self.screen.blit(label, (x, y))
-        label = small_font.render("Species", True, INK_SOFT)
-        self.screen.blit(label, (x + half_width + field_gap, y))
         y += 20
-        self.class_dropdown.draw(
-            self.screen,
-            pygame.Rect(x, y, half_width, control_height),
+        y = self.draw_chip_group(
+            self.class_chips,
+            pygame.Rect(x, y, control_width, 200),
             body_font,
             mouse_pos,
         )
-        self.species_dropdown.draw(
-            self.screen,
-            pygame.Rect(x + half_width + field_gap, y, half_width, control_height),
-            body_font,
-            mouse_pos,
-        )
-        y += control_height + 18
+        y += 14
 
-        label = small_font.render("Level (blank = random)", True, INK_SOFT)
+        label = small_font.render("Species Preferences (none = random)", True, INK_SOFT)
+        self.screen.blit(label, (x, y))
+        y += 20
+        y = self.draw_chip_group(
+            self.species_chips,
+            pygame.Rect(x, y, control_width, 200),
+            body_font,
+            mouse_pos,
+        )
+        y += 18
+
+        label = small_font.render("Level", True, INK_SOFT)
         self.screen.blit(label, (x, y))
         label = small_font.render("Number of characters", True, INK_SOFT)
         self.screen.blit(label, (x + half_width + field_gap, y))
         y += 20
-        self.level_input.draw(
+        self.level_dropdown.draw(
             self.screen,
             pygame.Rect(x, y, half_width, control_height),
             body_font,
@@ -916,24 +986,19 @@ class GeneratorApp:
         self.balance_box.draw(self.screen, pygame.Rect(x, y, control_width, 28), body_font, mouse_pos)
         y += 30
         self.spellbook_box.draw(self.screen, pygame.Rect(x, y, control_width, 28), body_font, mouse_pos)
-        y += 38
+        y += 30
+        self.spellcards_box.draw(self.screen, pygame.Rect(x, y, control_width, 28), body_font, mouse_pos)
+        y += 42
 
-        note_rect = pygame.Rect(x, y, control_width, max(110, int(left_rect.height * 0.18)))
-        self.draw_panel(note_rect, alpha=120)
-        draw_text(self.screen, "How this works", section_font, INK, (note_rect.x + 12, note_rect.y + 10), shadow=False)
-        note_lines = wrap_text(
-            "Use the class and species dropdowns for specific choices, type a level or party size, and leave fields on Random or blank when you want surprise adventurers.",
-            small_font,
-            note_rect.width - 24,
-        )
-        note_y = note_rect.y + 40
-        for line in note_lines[:5]:
-            draw_text(self.screen, line, small_font, INK_SOFT, (note_rect.x + 12, note_y), shadow=False)
-            note_y += small_font.get_linesize()
-        y = note_rect.bottom + 14
+        total_forge_height = y - (self.forge_content_rect.y - self.forge_scroll_offset)
+        max_forge_scroll = max(0, total_forge_height - self.forge_content_rect.height)
+        self.forge_scroll_offset = int(clamp(self.forge_scroll_offset, 0, max_forge_scroll))
 
-        button_gap = 10
-        button_height = max(42, int(height * 0.058))
+        self.screen.set_clip(previous_clip)
+
+        x = self.forge_footer_rect.x
+        y = self.forge_footer_rect.y
+        control_width = self.forge_footer_rect.width
         self.generate_button.draw(
             self.screen,
             pygame.Rect(x, y, control_width, button_height),
@@ -955,9 +1020,18 @@ class GeneratorApp:
             mouse_pos,
         )
 
+        if max_forge_scroll > 0:
+            track_rect = pygame.Rect(self.forge_content_rect.right - 6, self.forge_content_rect.y, 6, self.forge_content_rect.height)
+            pygame.draw.rect(self.screen, PARCHMENT_DARK, track_rect, border_radius=6)
+            thumb_height = max(28, int(self.forge_content_rect.height * (self.forge_content_rect.height / total_forge_height)))
+            scroll_ratio = 0 if max_forge_scroll == 0 else self.forge_scroll_offset / max_forge_scroll
+            thumb_y = self.forge_content_rect.y + int((self.forge_content_rect.height - thumb_height) * scroll_ratio)
+            thumb_rect = pygame.Rect(track_rect.x, thumb_y, track_rect.width, thumb_height)
+            pygame.draw.rect(self.screen, GOLD, thumb_rect, border_radius=6)
+
         self.draw_output_panel(right_rect, section_font, body_font)
-        for dropdown in (self.class_dropdown, self.species_dropdown, self.font_dropdown):
-            dropdown.draw_menu(self.screen, body_font, mouse_pos)
+        self.level_dropdown.draw_menu(self.screen, body_font, mouse_pos)
+        self.font_dropdown.draw_menu(self.screen, body_font, mouse_pos)
 
     def run(self) -> None:
         if self.smoke_test:
