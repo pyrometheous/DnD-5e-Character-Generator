@@ -33,7 +33,7 @@ The desktop GUI launcher is `main.pyw`.
 
 Screenshot:
 
-![GUI Screenshot](media/Screenshot_20260411_200858.png)
+![GUI Screenshot](media/Screenshot_20260412_025736.png)
 
 ### Linux
 

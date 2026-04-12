@@ -12,7 +12,7 @@ The desktop GUI launcher lives at `main.pyw` and provides controls for:
 
 ## Screenshot
 
-![GUI Screenshot](../media/Screenshot_20260411_200858.png)
+![GUI Screenshot](../media/Screenshot_20260412_025736.png)
 
 ## Setup
 
