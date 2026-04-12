@@ -2112,9 +2112,12 @@ def _draw_icon_legend(page, codes, x0, y0, max_width, font_path, font_obj):
 
     text_size = 8
     spacing = 10
-    y = y0
-    x = x0
-    line_height = 11
+    line_height = 14  # slightly more gap between rows
+
+    # First pass: bin entries into wrapped rows
+    rows = []
+    current_row = []
+    current_row_width = 0
 
     for code in codes:
         label = SPELLCARD_ICON_LEGEND.get(code, code)
@@ -2123,14 +2126,28 @@ def _draw_icon_legend(page, codes, x0, y0, max_width, font_path, font_obj):
         label_width = font_obj.text_length(label_text, fontsize=text_size)
         entry_width = icon_width + label_width + spacing
 
-        if (x + entry_width) > (x0 + max_width):
-            x = x0
-            y += line_height
+        if current_row and (current_row_width + entry_width) > max_width:
+            rows.append((current_row, current_row_width - spacing))
+            current_row = []
+            current_row_width = 0
 
-        used_icon_width = _draw_icon_token(page, x, y, code, font_path, font_obj, text_size)
-        x += used_icon_width
-        _draw_card_text(page, fitz.Point(x, y), label_text, font_path, text_size)
-        x += label_width + spacing
+        current_row.append((code, label_text, icon_width, label_width))
+        current_row_width += entry_width
+
+    if current_row:
+        rows.append((current_row, current_row_width - spacing))
+
+    # Second pass: draw each row centered within max_width
+    y = y0
+    for row_items, row_width in rows:
+        row_x0 = x0 + (max_width - row_width) / 2
+        x = row_x0
+        for code, label_text, icon_width, label_width in row_items:
+            used_icon_width = _draw_icon_token(page, x, y, code, font_path, font_obj, text_size)
+            x += used_icon_width
+            _draw_card_text(page, fitz.Point(x, y), label_text, font_path, text_size)
+            x += label_width + spacing
+        y += line_height
 
 
 def _spell_card_lines(spell, font_obj, fontsize, max_width):
@@ -2317,7 +2334,12 @@ def _collect_spell_cards(spellbook):
     ):
         add_spell(spell)
 
-    cards.sort(key=lambda entry: (int(entry.get('level', 0) or 0), entry.get('name', '')))
+    _school_order = {school: i for i, school in enumerate(SPELL_SCHOOL_ICON_CODES)}
+    cards.sort(key=lambda e: (
+        _school_order.get(str(e.get('school', '') or '').strip().lower(), len(_school_order)),
+        int(e.get('level', 0) or 0),
+        str(e.get('name', '') or ''),
+    ))
     return cards
 
 
@@ -2370,7 +2392,7 @@ def append_spell_cards(pdf_path, spellbook, font_name):
                     page,
                     codes=used_codes,
                     x0=grid_x0 + 2,
-                    y0=page_height - 13,
+                    y0=grid_y0 + grid_height + 14,
                     max_width=grid_width - 4,
                     font_path=font_path,
                     font_obj=font_obj,
