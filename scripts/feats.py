@@ -26,8 +26,9 @@ def load_feat_config(config_path: str | Path | None = None) -> dict:
         return json.load(handle)
 
 
-def choose_feat_for_character(character_obj, asi_level: int, config: dict | None = None):
+def choose_feat_for_character(character_obj, asi_level: int, config: dict | None = None, rng=None):
     config = config or load_feat_config()
+    rng = rng or getattr(character_obj, 'rng', random)
     selection = config.get('selection', {})
     max_feats = selection.get('max_feats_per_character')
     if max_feats is not None and len(character_obj.feats) >= int(max_feats):
@@ -45,7 +46,7 @@ def choose_feat_for_character(character_obj, asi_level: int, config: dict | None
     if total_weight <= 0:
         return None
 
-    roll = random.uniform(0, total_weight)
+    roll = rng.uniform(0, total_weight)
     upto = 0.0
     for option, weight in options:
         if weight <= 0:
@@ -54,12 +55,13 @@ def choose_feat_for_character(character_obj, asi_level: int, config: dict | None
         if roll <= upto:
             if option == 'asi':
                 return None
-            return resolve_feat_selection(character_obj, option, asi_level, config)
+            return resolve_feat_selection(character_obj, option, asi_level, config, rng=rng)
     return None
 
 
-def resolve_feat_selection(character_obj, feat: dict, asi_level: int, config: dict | None = None) -> dict:
+def resolve_feat_selection(character_obj, feat: dict, asi_level: int, config: dict | None = None, rng=None) -> dict:
     config = config or load_feat_config()
+    rng = rng or getattr(character_obj, 'rng', random)
     resolved = copy.deepcopy(feat)
     resolved['_applied'] = False
 
@@ -73,7 +75,7 @@ def resolve_feat_selection(character_obj, feat: dict, asi_level: int, config: di
         if ability in ABILITY_NAMES and getattr(character_obj, ability) < 20
     ]
     if ability_options:
-        chosen_ability = _choose_ability_option(character_obj, ability_options, asi_level)
+        chosen_ability = _choose_ability_option(character_obj, ability_options, asi_level, rng=rng)
         if chosen_ability:
             selected_ability_bonuses[chosen_ability] = selected_ability_bonuses.get(chosen_ability, 0) + 1
     resolved['selected_ability_bonuses'] = selected_ability_bonuses
@@ -82,11 +84,12 @@ def resolve_feat_selection(character_obj, feat: dict, asi_level: int, config: di
     resolved['selected_languages'] = _choose_languages(
         character_obj,
         int(grants.get('language_choices', 0)),
+        rng=rng,
     )
-    resolved['selected_proficiencies'] = _choose_proficiencies(character_obj, grants)
-    resolved['selected_saving_throw'] = _choose_saving_throw(character_obj, grants, asi_level)
-    resolved['selected_magic_class'] = _choose_magic_class(character_obj, grants)
-    resolved['selected_damage_type'] = _choose_damage_type(grants)
+    resolved['selected_proficiencies'] = _choose_proficiencies(character_obj, grants, rng=rng)
+    resolved['selected_saving_throw'] = _choose_saving_throw(character_obj, grants, asi_level, rng=rng)
+    resolved['selected_magic_class'] = _choose_magic_class(character_obj, grants, rng=rng)
+    resolved['selected_damage_type'] = _choose_damage_type(grants, rng=rng)
     resolved['summary'] = describe_feat_selection(resolved)
     return resolved
 
@@ -211,7 +214,8 @@ def _meets_prerequisites(character_obj, feat: dict) -> bool:
     return True
 
 
-def _choose_ability_option(character_obj, options: list[str], asi_level: int):
+def _choose_ability_option(character_obj, options: list[str], asi_level: int, rng=None):
+    rng = rng or getattr(character_obj, 'rng', random)
     weighted_options = []
     preferred_spell_ability = _preferred_spellcasting_ability(character_obj, asi_level)
     for ability_name in options:
@@ -231,7 +235,7 @@ def _choose_ability_option(character_obj, options: list[str], asi_level: int):
     if total <= 0:
         return None
 
-    roll = random.uniform(0, total)
+    roll = rng.uniform(0, total)
     upto = 0.0
     for ability_name, weight in weighted_options:
         if weight <= 0:
@@ -242,7 +246,8 @@ def _choose_ability_option(character_obj, options: list[str], asi_level: int):
     return weighted_options[-1][0]
 
 
-def _choose_languages(character_obj, count: int) -> list[str]:
+def _choose_languages(character_obj, count: int, rng=None) -> list[str]:
+    rng = rng or getattr(character_obj, 'rng', random)
     if count <= 0:
         return []
     known_languages = {_normalize_name(language) for language in character_obj.get_languages()}
@@ -251,11 +256,12 @@ def _choose_languages(character_obj, count: int) -> list[str]:
         language_name = getattr(Languages, language_index).name
         if _normalize_name(language_name) not in known_languages:
             available.append(language_name)
-    random.shuffle(available)
+    rng.shuffle(available)
     return available[:count]
 
 
-def _choose_proficiencies(character_obj, grants: dict) -> list[str]:
+def _choose_proficiencies(character_obj, grants: dict, rng=None) -> list[str]:
+    rng = rng or getattr(character_obj, 'rng', random)
     selected = []
 
     for proficiency_name in grants.get('proficiencies', []):
@@ -268,7 +274,7 @@ def _choose_proficiencies(character_obj, grants: dict) -> list[str]:
             skill_name for skill_name in _all_skill_names()
             if skill_name not in character_obj.skill_proficiencies
         ]
-        random.shuffle(available_skills)
+        rng.shuffle(available_skills)
         selected.extend(available_skills[:skill_choices])
 
     tool_choices = int(grants.get('tool_choices', 0))
@@ -277,7 +283,7 @@ def _choose_proficiencies(character_obj, grants: dict) -> list[str]:
             tool_name for tool_name in _all_tool_names()
             if not _character_has_proficiency(character_obj, tool_name)
         ]
-        random.shuffle(available_tools)
+        rng.shuffle(available_tools)
         selected.extend(available_tools[:tool_choices])
 
     skill_or_tool_choices = int(grants.get('skill_or_tool_choices', 0))
@@ -287,7 +293,7 @@ def _choose_proficiencies(character_obj, grants: dict) -> list[str]:
             *[tool_name for tool_name in _all_tool_names() if not _character_has_proficiency(character_obj, tool_name)],
         ]
         unique_pool = list(dict.fromkeys(mixed_pool))
-        random.shuffle(unique_pool)
+        rng.shuffle(unique_pool)
         selected.extend(unique_pool[:skill_or_tool_choices])
 
     weapon_choices = int(grants.get('weapon_choices', 0))
@@ -296,13 +302,13 @@ def _choose_proficiencies(character_obj, grants: dict) -> list[str]:
             weapon_name for weapon_name in _all_weapon_names()
             if not _character_has_proficiency(character_obj, weapon_name)
         ]
-        random.shuffle(available_weapons)
+        rng.shuffle(available_weapons)
         selected.extend(available_weapons[:weapon_choices])
 
     return list(dict.fromkeys(selected))
 
 
-def _choose_saving_throw(character_obj, grants: dict, asi_level: int):
+def _choose_saving_throw(character_obj, grants: dict, asi_level: int, rng=None):
     if not grants.get('saving_throw_choice'):
         return None
     available = [
@@ -311,10 +317,11 @@ def _choose_saving_throw(character_obj, grants: dict, asi_level: int):
     ]
     if not available:
         return None
-    return _choose_ability_option(character_obj, available, asi_level)
+    return _choose_ability_option(character_obj, available, asi_level, rng=rng)
 
 
-def _choose_magic_class(character_obj, grants: dict):
+def _choose_magic_class(character_obj, grants: dict, rng=None):
+    rng = rng or getattr(character_obj, 'rng', random)
     choices = grants.get('magic_class_choices', [])
     if not choices:
         return None
@@ -324,14 +331,15 @@ def _choose_magic_class(character_obj, grants: dict):
         preferred = _spellcasting_family_choice(character_obj)
         if preferred in choices:
             return preferred
-    return random.choice(choices)
+    return rng.choice(choices)
 
 
-def _choose_damage_type(grants: dict):
+def _choose_damage_type(grants: dict, rng=None):
+    rng = rng or random
     choices = grants.get('damage_type_choices', [])
     if not choices:
         return None
-    return random.choice(choices)
+    return rng.choice(choices)
 
 
 def _character_has_proficiency(character_obj, proficiency_name: str) -> bool:

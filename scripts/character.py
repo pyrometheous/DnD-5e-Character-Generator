@@ -1,5 +1,6 @@
 from scripts import roll
 from scripts.feats import choose_feat_for_character, load_feat_config
+from scripts.progression import ensure_progression
 
 from tinys_srd import Classes, Equipment, Proficiencies, Levels
 from tinys_srd import Races as Species
@@ -494,12 +495,14 @@ FEAT_CONFIG = load_feat_config()
 
 
 class Character:
-    def __init__(self, name, species, char_class, sex, level):
+    def __init__(self, name, species, char_class, sex, level, seed=None):
         self.name = name
         self.species = species
         self.sex = sex
         self.char_class = char_class
         self.level = int(level)
+        self.seed = seed
+        self.rng = random.Random(seed) if seed is not None else random
         self.strength = 0
         self.dexterity = 0
         self.constitution = 0
@@ -515,14 +518,25 @@ class Character:
         self.extra_languages = []        # from racial language choices
         self.asi_log = []                # track each ASI taken {ability: bonus}
         self.advancement_log = []        # ordered ASI-vs-feat selections
+        self.progression_choices = []    # ordered subclass/feature/spell decisions
         self.feats = []                  # optional selected feats (dict/object/string)
         self.speed_bonus = 0
         self.initiative_bonus = 0
         self.passive_perception_bonus = 0
         self.hp_bonus_per_level = 0
+        self.armor_class_bonus = 0
+        self.ranged_attack_bonus = 0
         self.aggressive_asi_focus = set()
         self.proficiencies = []
         self.equipment = []
+        self.subclass = None
+        self.subclass_index = None
+        self.feature_annotations = {}
+        self.bonus_features_by_level = {}
+        self.class_feature_choices = []
+        self.progression_built_to_level = 0
+        self.applied_subclass_feature_levels = set()
+        self.spellcasting_profile = None
         self.saving_throw_proficiencies = [
             st['name'] for st in char_class_attribute.saving_throws
         ]
@@ -549,34 +563,51 @@ class Character:
                     count += 1
         return count
 
-    def get_features(self):
-        features = []
-        for lvl in range(1, self.level + 1):
-            level_data = getattr(Levels, f"{self.char_class}_{lvl}")
-            for feat in level_data.features:
-                features.append(feat['name'])
-        return features
+    def _feature_label(self, level, feature, annotated=False, advancement_index=None):
+        feature_index = feature.get('index', feature['name'])
+        if (
+            annotated
+            and feature['name'] == 'Ability Score Improvement'
+            and advancement_index is not None
+            and advancement_index < len(self.advancement_log)
+        ):
+            record = self.advancement_log[advancement_index]
+            if record.get('type') == 'feat':
+                return record['feat'].get('summary', record['feat'].get('name', feature['name']))
+            bonuses = record.get('ability_bonuses', {})
+            parts = [f"+{value} {ability[:3].upper()}" for ability, value in bonuses.items() if value > 0]
+            if parts:
+                return f"Ability Score Improvement ({', '.join(parts)})"
+        return self.feature_annotations.get((level, feature_index), feature['name'])
 
-    def get_features_annotated(self):
-        """Return features with ASI entries replaced by ASI or feat choices."""
+    def _collect_feature_names(self, annotated=False):
         features = []
         advancement_index = 0
         for lvl in range(1, self.level + 1):
             level_data = getattr(Levels, f"{self.char_class}_{lvl}")
-            for feat in level_data.features:
-                name = feat['name']
-                if name == 'Ability Score Improvement' and advancement_index < len(self.advancement_log):
-                    record = self.advancement_log[advancement_index]
-                    if record.get('type') == 'feat':
-                        name = record['feat'].get('summary', record['feat'].get('name', name))
-                    else:
-                        bonuses = record.get('ability_bonuses', {})
-                        parts = [f"+{v} {k[:3].upper()}" for k, v in bonuses.items() if v > 0]
-                        if parts:
-                            name = f"Ability Score Improvement ({', '.join(parts)})"
+            for feature in level_data.features:
+                features.append(
+                    self._feature_label(
+                        lvl,
+                        feature,
+                        annotated=annotated,
+                        advancement_index=advancement_index,
+                    )
+                )
+                if feature['name'] == 'Ability Score Improvement':
                     advancement_index += 1
-                features.append(name)
+            features.extend(self.bonus_features_by_level.get(lvl, []))
         return features
+
+    def get_features(self):
+        return self._collect_feature_names(annotated=False)
+
+    def get_features_annotated(self):
+        """Return features with progression choices and ASI entries annotated."""
+        return self._collect_feature_names(annotated=True)
+
+    def armor_class(self):
+        return 10 + modifier(self.dexterity) + self.armor_class_bonus
 
     def get_speed(self):
         species_key = self.species.lower()
@@ -599,7 +630,7 @@ class Character:
     def passive_perception(self):
         return 10 + self.skill_modifier('Perception') + self.passive_perception_bonus
 
-    def _spellcaster_notes(self, prof_bonus):
+    def _spellcaster_notes(self, prof_bonus, spellbook=None):
         if self.char_class not in SPELLCASTING_ABILITY:
             return []
 
@@ -774,6 +805,47 @@ class Character:
                 'Species traits may grant additional spells; see your racial traits section.'
             ))
 
+        if self.subclass:
+            append_unique(f'Subclass: {self.subclass}.')
+
+        if spellbook:
+            focus = spellbook.get('spell_focus', {})
+            if focus:
+                summary_parts = []
+                for key in ('concentration', 'control', 'healing', 'ritual', 'damage'):
+                    count = int(focus.get(key, 0) or 0)
+                    if count > 0:
+                        summary_parts.append(f'{count} {key}')
+                if summary_parts:
+                    append_unique(f"Current spell focus: {', '.join(summary_parts)}.")
+
+            replacements = spellbook.get('replacement_log', [])
+            if replacements:
+                latest = replacements[-1]
+                append_unique(
+                    f"Latest spell swap: {latest['replaced']} -> {latest['new_spell']} at level {latest['level']}."
+                )
+
+        return notes
+
+    def _progression_notes(self):
+        notes = []
+        if self.subclass:
+            notes.append(f'Subclass: {self.subclass}.')
+
+        grouped = {}
+        for record in self.class_feature_choices:
+            feature_name = record.get('feature_name', 'Feature')
+            choice_name = record.get('choice_name', '')
+            if ': ' in choice_name:
+                choice_name = choice_name.split(': ', 1)[1]
+            grouped.setdefault(feature_name, [])
+            if choice_name and choice_name not in grouped[feature_name]:
+                grouped[feature_name].append(choice_name)
+
+        for feature_name, choice_names in grouped.items():
+            notes.append(f"{feature_name}: {', '.join(choice_names)}.")
+
         return notes
 
     def get_traits(self):
@@ -789,69 +861,46 @@ class Character:
             current = getattr(self, ability)
             setattr(self, ability, current + bonus['bonus'])
 
-    def apply_asi(self):
-        """Apply all Ability Score Improvements earned up to the current level.
-
-        Each ASI distributes +2 points using the following priority:
-
-                For any character at ASI levels < 10
-                    1. Any ability below 10 (reduce/remove negative modifiers early)
-                    2. Then continue with the class-based rules below
-
-        For spellcasters at ASI levels ≤ 15
-          1. Spellcasting ability (regardless of current parity)
-          2. Any other ability currently at an odd score  (odd → even = +1 modifier)
-          3. Any other ability < 20
-
-        For non-casters, or ASI levels > 15
-          1. Any ability currently at an odd score  (odd → even = +1 modifier)
-          2. Any ability < 20
-
-        ASI levels are discovered from class feature names rather than the
-        ability_score_bonuses field, which has a known data error for Rogue.
-        """
+    def apply_asi_level(self, asi_level):
         spellcast_ability = SPELLCASTING_ABILITY.get(self.char_class)
 
-        # Collect the character level at which each ASI is granted, in order.
-        asi_levels = []
+        aggressive_focus = self._refresh_aggressive_asi_focus()
+        force_asi = bool(
+            ASI_WEIGHT_CONFIG['global'].get('force_asi_when_important_below_floor', True)
+            and aggressive_focus
+        )
+
+        if not force_asi:
+            selected_feat = choose_feat_for_character(self, asi_level, FEAT_CONFIG, rng=self.rng)
+            if selected_feat is not None:
+                self._apply_selected_feat(selected_feat)
+                self.advancement_log.append({'type': 'feat', 'feat': selected_feat})
+                return
+
+        prefer_sc = (spellcast_ability if (spellcast_ability and asi_level <= 15) else None)
+        prioritize_sub_ten = asi_level < 10
+        first, second = self._rank_asi_candidates(
+            prefer_spellcast_ability=prefer_sc,
+            prioritize_sub_ten=prioritize_sub_ten,
+            aggressive_focus=aggressive_focus,
+        )
+
+        asi_record = {}
+        for ability in (entry for entry in (first, second) if entry is not None):
+            score = getattr(self, ability)
+            if score < 20:
+                setattr(self, ability, score + 1)
+                asi_record[ability] = asi_record.get(ability, 0) + 1
+        self.asi_log.append(asi_record)
+        self.advancement_log.append({'type': 'asi', 'ability_bonuses': asi_record})
+
+    def apply_asi(self):
+        """Apply all Ability Score Improvements earned up to the current level."""
         for lvl in range(1, self.level + 1):
             level_data = getattr(Levels, f"{self.char_class}_{lvl}")
             for feat in level_data.features:
                 if feat['name'] == 'Ability Score Improvement':
-                    asi_levels.append(lvl)
-
-        for asi_level in asi_levels:
-            aggressive_focus = self._refresh_aggressive_asi_focus()
-            force_asi = bool(
-                ASI_WEIGHT_CONFIG['global'].get('force_asi_when_important_below_floor', True)
-                and aggressive_focus
-            )
-
-            if not force_asi:
-                selected_feat = choose_feat_for_character(self, asi_level, FEAT_CONFIG)
-                if selected_feat is not None:
-                    self._apply_selected_feat(selected_feat)
-                    self.advancement_log.append({'type': 'feat', 'feat': selected_feat})
-                    continue
-
-            prefer_sc = (spellcast_ability
-                         if (spellcast_ability and asi_level <= 15)
-                         else None)
-            prioritize_sub_ten = asi_level < 10
-            first, second = self._rank_asi_candidates(
-                prefer_spellcast_ability=prefer_sc,
-                prioritize_sub_ten=prioritize_sub_ten,
-                aggressive_focus=aggressive_focus,
-            )
-
-            asi_record = {}
-            for ability in (a for a in (first, second) if a is not None):
-                s = getattr(self, ability)
-                if s < 20:
-                    setattr(self, ability, s + 1)
-                    asi_record[ability] = asi_record.get(ability, 0) + 1
-            self.asi_log.append(asi_record)
-            self.advancement_log.append({'type': 'asi', 'ability_bonuses': asi_record})
+                    self.apply_asi_level(lvl)
 
     def _rank_asi_candidates(self, prefer_spellcast_ability, prioritize_sub_ten=False, aggressive_focus=None):
         """Return (first, second) ability names for one ASI (+2 points total).
@@ -1090,7 +1139,7 @@ class Character:
                         skill_options.append(skill_name)
                 if skill_options:
                     num_choose = min(choice['choose'], len(skill_options))
-                    self.skill_proficiencies = random.sample(skill_options, num_choose)
+                    self.skill_proficiencies = self.rng.sample(skill_options, num_choose)
 
     def skill_modifier(self, skill_name):
         skill_info = SKILLS[skill_name]
@@ -1120,7 +1169,7 @@ class Character:
                     num_pick = min(num_pick, len(eligible))
                     if num_pick > 0:
                         self.expertise_skills.extend(
-                            random.sample(eligible, num_pick)
+                            self.rng.sample(eligible, num_pick)
                         )
 
     def apply_jack_of_all_trades(self):
@@ -1137,7 +1186,7 @@ class Character:
             lang_opts = race_data.language_options
             options = lang_opts['from']['options']
             num_choose = min(lang_opts['choose'], len(options))
-            chosen = random.sample(options, num_choose)
+            chosen = self.rng.sample(options, num_choose)
             for opt in chosen:
                 lang_name = opt['item']['name']
                 if lang_name not in self.extra_languages:
@@ -1148,7 +1197,7 @@ class Character:
             prof_opts = race_data.starting_proficiency_options
             options = prof_opts['from']['options']
             num_choose = min(prof_opts['choose'], len(options))
-            chosen = random.sample(options, num_choose)
+            chosen = self.rng.sample(options, num_choose)
             for opt in chosen:
                 prof_name = opt['item']['name']
                 if prof_name.startswith('Skill: '):
@@ -1188,9 +1237,9 @@ class Character:
         self.choose_skill_proficiencies()
         self.populate_proficiencies()
         self.choose_racial_options()        # racial language & proficiency picks
+        ensure_progression(self)
         self.choose_expertise()             # Expertise from class features
         self.apply_jack_of_all_trades()     # JOAT half-prof flag
-        self.apply_asi()
         self.apply_feat_ability_bonuses()   # apply any externally injected pending feats
         self.hp = hp(level=self.level, constitution=self.constitution,
                  hit_die=self.hit_die) + (self.hp_bonus_per_level * self.level)
@@ -1218,7 +1267,7 @@ class Character:
         Class: {self.char_class.capitalize()}
         Level: {self.level}
         HP: {self.hp}
-        AC: {10 + modifier(self.dexterity)}
+        AC: {self.armor_class()}
         Speed: {self.get_speed()} ft
         Strength: {self.strength} ({modifier(self.strength):+d})
         Dexterity: {self.dexterity} ({modifier(self.dexterity):+d})
@@ -1266,7 +1315,7 @@ class Character:
             "ProfBonus": prof_bonus,
             "HD": self.hit_die,
             "HDTotal": str(self.hit_die_total()),
-            "AC": 10 + modifier(self.dexterity),
+            "AC": self.armor_class(),
             "Initiative": modifier(self.dexterity) + self.initiative_bonus,
             "Speed": self.get_speed(),
             "Passive": self.passive_perception(),
@@ -1322,7 +1371,10 @@ class Character:
         features = self.get_features_annotated()
         fields['Features and Traits'] = '\n'.join(features)
         trait_lines = list(traits)
-        spellcaster_notes = self._spellcaster_notes(prof_bonus)
+        progression_notes = self._progression_notes()
+        if progression_notes:
+            trait_lines.extend([''] + progression_notes)
+        spellcaster_notes = self._spellcaster_notes(prof_bonus, spellbook=spellbook)
         if spellcaster_notes:
             trait_lines.extend([''] + spellcaster_notes)
         fields['Feat+Traits'] = '\n'.join(trait_lines)
@@ -1339,6 +1391,8 @@ class Character:
                     is_ranged = getattr(eq_data, 'weapon_range', '') == 'Ranged'
                     atk_mod = dex_mod if (is_ranged or is_finesse) else str_mod
                     atk_bonus = atk_mod + prof_bonus
+                    if is_ranged:
+                        atk_bonus += self.ranged_attack_bonus
                     dmg_dice = eq_data.damage['damage_dice']
                     dmg_type = eq_data.damage['damage_type']['name']
                     if not weapon_equipped:
@@ -1372,7 +1426,7 @@ class Character:
         fillpdfs.write_fillable_pdf(input_pdf_filename, output_pdf_filename, fields)
 
         if font_name is None:
-            font_name = random.choice(list(AVAILABLE_FONTS.keys()))
+            font_name = self.rng.choice(list(AVAILABLE_FONTS.keys()))
         apply_custom_font(output_pdf_filename, font_name,
                           expertise_skills=self.expertise_skills)
 
@@ -1721,22 +1775,23 @@ def stat_generator():
     return stat
 
 
-def create_random_character(level=None, char_class=None, species=None):
+def create_random_character(level=None, char_class=None, species=None, seed=None):
+    rng = random.Random(seed) if seed is not None else random
     if char_class is None:
-        char_class = random_character_class()
+        char_class = rng.choice(Classes.entries)
     if species is None:
-        species = random_species()
+        species = rng.choice(Species.entries).capitalize()
     if level is None:
         level = roll.d20()
 
     level = max(1, min(20, int(level)))
 
     fictional_names_species = SPECIES_NAMES.get(species, "human")
-    sex = random.choice(['male', 'female']).capitalize()
+    sex = rng.choice(['male', 'female']).capitalize()
     name = names(gender=sex, style=fictional_names_species)
 
     my_character = Character(name=name, species=species, char_class=char_class,
-                             sex=sex, level=level)
+                             sex=sex, level=level, seed=seed)
     my_character.roll_stats()
 
     # Add starting equipment from class
@@ -1749,14 +1804,14 @@ def create_random_character(level=None, char_class=None, species=None):
     return my_character
 
 
-def create_character(name, species, character_class, sex, level):
+def create_character(name, species, character_class, sex, level, seed=None):
     if species not in list(SPECIES_NAMES.keys()):
         raise ValueError(f"Specified Species Not Supported. Choose from: {list(SPECIES_NAMES.keys())}")
     if character_class not in AVAILABLE_CLASSES:
         raise ValueError(f"Specified Character Class Not Supported. Choose from: {AVAILABLE_CLASSES}")
     level = max(1, min(20, int(level)))
     my_character = Character(name=name, char_class=character_class, sex=sex,
-                             species=species, level=level)
+                             species=species, level=level, seed=seed)
     my_character.roll_stats()
 
     cls = getattr(Classes, character_class)

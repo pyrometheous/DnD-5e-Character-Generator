@@ -1,0 +1,716 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "owner": "DnD Character Generator",
+    "last_updated": "2026-04-11",
+    "purpose": "Controls deterministic level-up orchestration, subclass selection, class-feature weighting, and spell progression heuristics.",
+    "examples": [
+      "Bias paladins toward Defense style: raise feature_selection.paladin-fighting-style.weights.fighting-style-defense.",
+      "Make warlocks favor Fiend expanded-list damage spells: increase spellcasting.class_strategies.warlock.expanded_spell_bonus."
+    ],
+    "notes": [
+      "This file is strict JSON. Use _meta fields for documentation instead of // comments.",
+      "subclass_selection: weighted subclass picks keyed by lowercase class and tinys_srd subclass index.",
+      "feature_selection: weighted option picks for class features and other exposed PHB choice points.",
+      "feature_selection.*.grants: mechanical effects reflected on the sheet when applicable.",
+      "subclass_fallbacks: level-based subclass features and choice hooks when tinys_srd does not expose subclass milestone data inline.",
+      "spellcasting.slot_fallbacks: PHB spell slot tables used to supplement missing/incomplete tinys_srd slot fields.",
+      "spellcasting.class_strategies: class heuristics for spell additions, replacements, concentration balance, and prepared loadouts."
+    ]
+  },
+  "subclass_selection": {
+    "cleric": {
+      "life": 1.0
+    },
+    "fighter": {
+      "champion": 1.0
+    },
+    "paladin": {
+      "devotion": 1.0
+    },
+    "ranger": {
+      "hunter": 1.0
+    },
+    "sorcerer": {
+      "draconic": 1.0
+    },
+    "warlock": {
+      "fiend": 1.0
+    }
+  },
+  "feature_selection": {
+    "fighter-fighting-style": {
+      "weights": {
+        "fighter-fighting-style-defense": 1.6,
+        "fighter-fighting-style-archery": 1.3,
+        "fighter-fighting-style-dueling": 1.2,
+        "fighter-fighting-style-great-weapon-fighting": 1.2,
+        "fighter-fighting-style-protection": 0.9,
+        "fighter-fighting-style-two-weapon-fighting": 1.0
+      },
+      "grants": {
+        "fighter-fighting-style-defense": {
+          "ac_bonus": 1
+        },
+        "fighter-fighting-style-archery": {
+          "ranged_attack_bonus": 2
+        }
+      }
+    },
+    "paladin-fighting-style": {
+      "weights": {
+        "fighting-style-defense": 1.7,
+        "fighting-style-dueling": 1.2,
+        "fighting-style-great-weapon-fighting": 1.15,
+        "fighting-style-protection": 1.0
+      },
+      "grants": {
+        "fighting-style-defense": {
+          "ac_bonus": 1
+        }
+      }
+    },
+    "ranger-fighting-style": {
+      "weights": {
+        "ranger-fighting-style-archery": 1.7,
+        "ranger-fighting-style-defense": 1.2,
+        "ranger-fighting-style-dueling": 1.0,
+        "ranger-fighting-style-two-weapon-fighting": 1.05
+      },
+      "grants": {
+        "ranger-fighting-style-archery": {
+          "ranged_attack_bonus": 2
+        },
+        "ranger-fighting-style-defense": {
+          "ac_bonus": 1
+        }
+      }
+    },
+    "additional-fighting-style": {
+      "weights": {
+        "fighter-fighting-style-defense": 1.5,
+        "fighter-fighting-style-archery": 1.2,
+        "fighter-fighting-style-dueling": 1.1,
+        "fighter-fighting-style-great-weapon-fighting": 1.1,
+        "fighter-fighting-style-protection": 0.9,
+        "fighter-fighting-style-two-weapon-fighting": 0.95
+      },
+      "grants": {
+        "fighter-fighting-style-defense": {
+          "ac_bonus": 1
+        },
+        "fighter-fighting-style-archery": {
+          "ranged_attack_bonus": 2
+        }
+      }
+    },
+    "eldritch-invocations": {
+      "weights": {
+        "eldritch-invocation-agonizing-blast": 2.3,
+        "eldritch-invocation-repelling-blast": 1.7,
+        "eldritch-invocation-beguiling-influence": 1.3,
+        "eldritch-invocation-book-of-ancient-secrets": 1.3,
+        "eldritch-invocation-devils-sight": 1.2,
+        "eldritch-invocation-mask-of-many-faces": 1.2,
+        "eldritch-invocation-thirsting-blade": 1.5,
+        "eldritch-invocation-fiendish-vigor": 1.1
+      },
+      "replacement": {
+        "enabled": true,
+        "chance": 0.45
+      },
+      "grants": {
+        "eldritch-invocation-beguiling-influence": {
+          "skill_proficiencies": [
+            "Deception",
+            "Persuasion"
+          ]
+        }
+      }
+    },
+    "metamagic-1": {
+      "weights": {
+        "metamagic-quickened-spell": 1.8,
+        "metamagic-twinned-spell": 1.7,
+        "metamagic-subtle-spell": 1.2,
+        "metamagic-careful-spell": 1.1,
+        "metamagic-heightened-spell": 1.1,
+        "metamagic-empowered-spell": 1.0,
+        "metamagic-distant-spell": 0.95,
+        "metamagic-extended-spell": 0.9
+      }
+    },
+    "metamagic-2": {
+      "weights": {
+        "metamagic-quickened-spell": 1.7,
+        "metamagic-twinned-spell": 1.6,
+        "metamagic-subtle-spell": 1.2,
+        "metamagic-careful-spell": 1.0,
+        "metamagic-heightened-spell": 1.15,
+        "metamagic-empowered-spell": 1.0,
+        "metamagic-distant-spell": 0.95,
+        "metamagic-extended-spell": 0.9
+      }
+    },
+    "metamagic-3": {
+      "weights": {
+        "metamagic-quickened-spell": 1.6,
+        "metamagic-twinned-spell": 1.5,
+        "metamagic-subtle-spell": 1.2,
+        "metamagic-careful-spell": 1.0,
+        "metamagic-heightened-spell": 1.2,
+        "metamagic-empowered-spell": 1.0,
+        "metamagic-distant-spell": 0.95,
+        "metamagic-extended-spell": 0.9
+      }
+    },
+    "pact-boon": {
+      "weights": {
+        "pact-of-the-blade": 1.35,
+        "pact-of-the-chain": 1.0,
+        "pact-of-the-tome": 1.25
+      }
+    },
+    "dragon-ancestor": {
+      "weights": {
+        "dragon-ancestor-red---fire-damage": 1.25,
+        "dragon-ancestor-gold---fire-damage": 1.15,
+        "dragon-ancestor-blue---lightning-damage": 1.1,
+        "dragon-ancestor-bronze---lightning-damage": 1.05,
+        "dragon-ancestor-silver---cold-damage": 1.05,
+        "dragon-ancestor-white---cold-damage": 1.0,
+        "dragon-ancestor-black---acid-damage": 0.95,
+        "dragon-ancestor-copper---acid-damage": 0.95,
+        "dragon-ancestor-green---poison-damage": 0.9,
+        "dragon-ancestor-brass---fire-damage": 1.0
+      }
+    },
+    "hunters-prey": {
+      "weights": {
+        "hunters-prey-colossus-slayer": 1.5,
+        "hunters-prey-horde-breaker": 1.15,
+        "hunters-prey-giant-killer": 0.95
+      }
+    },
+    "defensive-tactics": {
+      "weights": {
+        "defensive-tactics-multiattack-defense": 1.25,
+        "defensive-tactics-escape-the-horde": 1.1,
+        "defensive-tactics-steel-will": 1.0
+      }
+    },
+    "multiattack": {
+      "weights": {
+        "multiattack-volley": 1.15,
+        "multiattack-whirlwind-attack": 1.0
+      }
+    },
+    "superior-hunters-defense": {
+      "weights": {
+        "superior-hunters-defense-evasion": 1.25,
+        "superior-hunters-defense-uncanny-dodge": 1.15,
+        "superior-hunters-defense-stand-against-the-tide": 0.95
+      }
+    },
+    "circle-of-the-land": {
+      "weights": {
+        "circle-of-the-land-forest": 1.25,
+        "circle-of-the-land-grassland": 1.15,
+        "circle-of-the-land-arctic": 1.0,
+        "circle-of-the-land-coast": 1.0,
+        "circle-of-the-land-desert": 0.95,
+        "circle-of-the-land-mountain": 0.95,
+        "circle-of-the-land-swamp": 0.95
+      }
+    }
+  },
+  "subclass_fallbacks": {
+    "cleric": {
+      "life": {
+        "name": "Life Domain",
+        "features_by_level": {
+          "1": [
+            {
+              "name": "Bonus Proficiency",
+              "grants": {
+                "proficiencies": [
+                  "Heavy Armor"
+                ]
+              }
+            },
+            {
+              "name": "Disciple of Life"
+            }
+          ],
+          "2": [
+            {
+              "name": "Channel Divinity: Preserve Life"
+            }
+          ],
+          "6": [
+            {
+              "name": "Blessed Healer"
+            }
+          ],
+          "8": [
+            {
+              "name": "Divine Strike"
+            }
+          ],
+          "17": [
+            {
+              "name": "Supreme Healing"
+            }
+          ]
+        }
+      }
+    },
+    "fighter": {
+      "champion": {
+        "name": "Champion",
+        "choice_features_by_level": {
+          "10": [
+            "additional-fighting-style"
+          ]
+        },
+        "features_by_level": {
+          "3": [
+            {
+              "name": "Improved Critical"
+            }
+          ],
+          "7": [
+            {
+              "name": "Remarkable Athlete"
+            }
+          ],
+          "15": [
+            {
+              "name": "Superior Critical"
+            }
+          ],
+          "18": [
+            {
+              "name": "Survivor"
+            }
+          ]
+        }
+      }
+    },
+    "paladin": {
+      "devotion": {
+        "name": "Oath of Devotion",
+        "features_by_level": {
+          "3": [
+            {
+              "name": "Channel Divinity: Sacred Weapon"
+            },
+            {
+              "name": "Channel Divinity: Turn the Unholy"
+            }
+          ],
+          "7": [
+            {
+              "name": "Aura of Devotion"
+            }
+          ],
+          "15": [
+            {
+              "name": "Purity of Spirit"
+            }
+          ],
+          "20": [
+            {
+              "name": "Holy Nimbus"
+            }
+          ]
+        }
+      }
+    },
+    "ranger": {
+      "hunter": {
+        "name": "Hunter",
+        "choice_features_by_level": {
+          "3": [
+            "hunters-prey"
+          ],
+          "7": [
+            "defensive-tactics"
+          ],
+          "11": [
+            "multiattack"
+          ],
+          "15": [
+            "superior-hunters-defense"
+          ]
+        }
+      }
+    },
+    "sorcerer": {
+      "draconic": {
+        "name": "Draconic Bloodline",
+        "choice_features_by_level": {
+          "1": [
+            "dragon-ancestor"
+          ]
+        },
+        "features_by_level": {
+          "1": [
+            {
+              "name": "Draconic Resilience",
+              "grants": {
+                "ac_bonus": 3,
+                "hp_per_level_bonus": 1
+              }
+            }
+          ],
+          "6": [
+            {
+              "name": "Elemental Affinity"
+            }
+          ],
+          "14": [
+            {
+              "name": "Dragon Wings"
+            }
+          ],
+          "18": [
+            {
+              "name": "Draconic Presence"
+            }
+          ]
+        }
+      }
+    },
+    "warlock": {
+      "fiend": {
+        "name": "The Fiend",
+        "features_by_level": {
+          "1": [
+            {
+              "name": "Dark One's Blessing"
+            }
+          ],
+          "6": [
+            {
+              "name": "Dark One's Own Luck"
+            }
+          ],
+          "10": [
+            {
+              "name": "Fiendish Resilience"
+            }
+          ],
+          "14": [
+            {
+              "name": "Hurl Through Hell"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "spellcasting": {
+    "slot_fallbacks": {
+      "bard": {
+        "1": [2, 0, 0, 0, 0, 0, 0, 0, 0],
+        "2": [3, 0, 0, 0, 0, 0, 0, 0, 0],
+        "3": [4, 2, 0, 0, 0, 0, 0, 0, 0],
+        "4": [4, 3, 0, 0, 0, 0, 0, 0, 0],
+        "5": [4, 3, 2, 0, 0, 0, 0, 0, 0],
+        "6": [4, 3, 3, 0, 0, 0, 0, 0, 0],
+        "7": [4, 3, 3, 1, 0, 0, 0, 0, 0],
+        "8": [4, 3, 3, 2, 0, 0, 0, 0, 0],
+        "9": [4, 3, 3, 3, 1, 0, 0, 0, 0],
+        "10": [4, 3, 3, 3, 2, 0, 0, 0, 0],
+        "11": [4, 3, 3, 3, 2, 1, 0, 0, 0],
+        "12": [4, 3, 3, 3, 2, 1, 0, 0, 0],
+        "13": [4, 3, 3, 3, 2, 1, 1, 0, 0],
+        "14": [4, 3, 3, 3, 2, 1, 1, 0, 0],
+        "15": [4, 3, 3, 3, 2, 1, 1, 1, 0],
+        "16": [4, 3, 3, 3, 2, 1, 1, 1, 0],
+        "17": [4, 3, 3, 3, 2, 1, 1, 1, 1],
+        "18": [4, 3, 3, 3, 3, 1, 1, 1, 1],
+        "19": [4, 3, 3, 3, 3, 2, 1, 1, 1],
+        "20": [4, 3, 3, 3, 3, 2, 2, 1, 1]
+      },
+      "cleric": {
+        "1": [2, 0, 0, 0, 0, 0, 0, 0, 0],
+        "2": [3, 0, 0, 0, 0, 0, 0, 0, 0],
+        "3": [4, 2, 0, 0, 0, 0, 0, 0, 0],
+        "4": [4, 3, 0, 0, 0, 0, 0, 0, 0],
+        "5": [4, 3, 2, 0, 0, 0, 0, 0, 0],
+        "6": [4, 3, 3, 0, 0, 0, 0, 0, 0],
+        "7": [4, 3, 3, 1, 0, 0, 0, 0, 0],
+        "8": [4, 3, 3, 2, 0, 0, 0, 0, 0],
+        "9": [4, 3, 3, 3, 1, 0, 0, 0, 0],
+        "10": [4, 3, 3, 3, 2, 0, 0, 0, 0],
+        "11": [4, 3, 3, 3, 2, 1, 0, 0, 0],
+        "12": [4, 3, 3, 3, 2, 1, 0, 0, 0],
+        "13": [4, 3, 3, 3, 2, 1, 1, 0, 0],
+        "14": [4, 3, 3, 3, 2, 1, 1, 0, 0],
+        "15": [4, 3, 3, 3, 2, 1, 1, 1, 0],
+        "16": [4, 3, 3, 3, 2, 1, 1, 1, 0],
+        "17": [4, 3, 3, 3, 2, 1, 1, 1, 1],
+        "18": [4, 3, 3, 3, 3, 1, 1, 1, 1],
+        "19": [4, 3, 3, 3, 3, 2, 1, 1, 1],
+        "20": [4, 3, 3, 3, 3, 2, 2, 1, 1]
+      },
+      "druid": {
+        "1": [2, 0, 0, 0, 0, 0, 0, 0, 0],
+        "2": [3, 0, 0, 0, 0, 0, 0, 0, 0],
+        "3": [4, 2, 0, 0, 0, 0, 0, 0, 0],
+        "4": [4, 3, 0, 0, 0, 0, 0, 0, 0],
+        "5": [4, 3, 2, 0, 0, 0, 0, 0, 0],
+        "6": [4, 3, 3, 0, 0, 0, 0, 0, 0],
+        "7": [4, 3, 3, 1, 0, 0, 0, 0, 0],
+        "8": [4, 3, 3, 2, 0, 0, 0, 0, 0],
+        "9": [4, 3, 3, 3, 1, 0, 0, 0, 0],
+        "10": [4, 3, 3, 3, 2, 0, 0, 0, 0],
+        "11": [4, 3, 3, 3, 2, 1, 0, 0, 0],
+        "12": [4, 3, 3, 3, 2, 1, 0, 0, 0],
+        "13": [4, 3, 3, 3, 2, 1, 1, 0, 0],
+        "14": [4, 3, 3, 3, 2, 1, 1, 0, 0],
+        "15": [4, 3, 3, 3, 2, 1, 1, 1, 0],
+        "16": [4, 3, 3, 3, 2, 1, 1, 1, 0],
+        "17": [4, 3, 3, 3, 2, 1, 1, 1, 1],
+        "18": [4, 3, 3, 3, 3, 1, 1, 1, 1],
+        "19": [4, 3, 3, 3, 3, 2, 1, 1, 1],
+        "20": [4, 3, 3, 3, 3, 2, 2, 1, 1]
+      },
+      "paladin": {
+        "1": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        "2": [2, 0, 0, 0, 0, 0, 0, 0, 0],
+        "3": [3, 0, 0, 0, 0, 0, 0, 0, 0],
+        "4": [3, 0, 0, 0, 0, 0, 0, 0, 0],
+        "5": [4, 2, 0, 0, 0, 0, 0, 0, 0],
+        "6": [4, 2, 0, 0, 0, 0, 0, 0, 0],
+        "7": [4, 3, 0, 0, 0, 0, 0, 0, 0],
+        "8": [4, 3, 0, 0, 0, 0, 0, 0, 0],
+        "9": [4, 3, 2, 0, 0, 0, 0, 0, 0],
+        "10": [4, 3, 2, 0, 0, 0, 0, 0, 0],
+        "11": [4, 3, 3, 0, 0, 0, 0, 0, 0],
+        "12": [4, 3, 3, 0, 0, 0, 0, 0, 0],
+        "13": [4, 3, 3, 1, 0, 0, 0, 0, 0],
+        "14": [4, 3, 3, 1, 0, 0, 0, 0, 0],
+        "15": [4, 3, 3, 2, 0, 0, 0, 0, 0],
+        "16": [4, 3, 3, 2, 0, 0, 0, 0, 0],
+        "17": [4, 3, 3, 3, 1, 0, 0, 0, 0],
+        "18": [4, 3, 3, 3, 1, 0, 0, 0, 0],
+        "19": [4, 3, 3, 3, 2, 0, 0, 0, 0],
+        "20": [4, 3, 3, 3, 2, 0, 0, 0, 0]
+      },
+      "ranger": {
+        "1": [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        "2": [2, 0, 0, 0, 0, 0, 0, 0, 0],
+        "3": [3, 0, 0, 0, 0, 0, 0, 0, 0],
+        "4": [3, 0, 0, 0, 0, 0, 0, 0, 0],
+        "5": [4, 2, 0, 0, 0, 0, 0, 0, 0],
+        "6": [4, 2, 0, 0, 0, 0, 0, 0, 0],
+        "7": [4, 3, 0, 0, 0, 0, 0, 0, 0],
+        "8": [4, 3, 0, 0, 0, 0, 0, 0, 0],
+        "9": [4, 3, 2, 0, 0, 0, 0, 0, 0],
+        "10": [4, 3, 2, 0, 0, 0, 0, 0, 0],
+        "11": [4, 3, 3, 0, 0, 0, 0, 0, 0],
+        "12": [4, 3, 3, 0, 0, 0, 0, 0, 0],
+        "13": [4, 3, 3, 1, 0, 0, 0, 0, 0],
+        "14": [4, 3, 3, 1, 0, 0, 0, 0, 0],
+        "15": [4, 3, 3, 2, 0, 0, 0, 0, 0],
+        "16": [4, 3, 3, 2, 0, 0, 0, 0, 0],
+        "17": [4, 3, 3, 3, 1, 0, 0, 0, 0],
+        "18": [4, 3, 3, 3, 1, 0, 0, 0, 0],
+        "19": [4, 3, 3, 3, 2, 0, 0, 0, 0],
+        "20": [4, 3, 3, 3, 2, 0, 0, 0, 0]
+      },
+      "sorcerer": {
+        "1": [2, 0, 0, 0, 0, 0, 0, 0, 0],
+        "2": [3, 0, 0, 0, 0, 0, 0, 0, 0],
+        "3": [4, 2, 0, 0, 0, 0, 0, 0, 0],
+        "4": [4, 3, 0, 0, 0, 0, 0, 0, 0],
+        "5": [4, 3, 2, 0, 0, 0, 0, 0, 0],
+        "6": [4, 3, 3, 0, 0, 0, 0, 0, 0],
+        "7": [4, 3, 3, 1, 0, 0, 0, 0, 0],
+        "8": [4, 3, 3, 2, 0, 0, 0, 0, 0],
+        "9": [4, 3, 3, 3, 1, 0, 0, 0, 0],
+        "10": [4, 3, 3, 3, 2, 0, 0, 0, 0],
+        "11": [4, 3, 3, 3, 2, 1, 0, 0, 0],
+        "12": [4, 3, 3, 3, 2, 1, 0, 0, 0],
+        "13": [4, 3, 3, 3, 2, 1, 1, 0, 0],
+        "14": [4, 3, 3, 3, 2, 1, 1, 0, 0],
+        "15": [4, 3, 3, 3, 2, 1, 1, 1, 0],
+        "16": [4, 3, 3, 3, 2, 1, 1, 1, 0],
+        "17": [4, 3, 3, 3, 2, 1, 1, 1, 1],
+        "18": [4, 3, 3, 3, 3, 1, 1, 1, 1],
+        "19": [4, 3, 3, 3, 3, 2, 1, 1, 1],
+        "20": [4, 3, 3, 3, 3, 2, 2, 1, 1]
+      },
+      "warlock": {
+        "1": [1, 0, 0, 0, 0, 0, 0, 0, 0],
+        "2": [2, 0, 0, 0, 0, 0, 0, 0, 0],
+        "3": [0, 2, 0, 0, 0, 0, 0, 0, 0],
+        "4": [0, 2, 0, 0, 0, 0, 0, 0, 0],
+        "5": [0, 0, 2, 0, 0, 0, 0, 0, 0],
+        "6": [0, 0, 2, 0, 0, 0, 0, 0, 0],
+        "7": [0, 0, 0, 2, 0, 0, 0, 0, 0],
+        "8": [0, 0, 0, 2, 0, 0, 0, 0, 0],
+        "9": [0, 0, 0, 0, 2, 0, 0, 0, 0],
+        "10": [0, 0, 0, 0, 2, 0, 0, 0, 0],
+        "11": [0, 0, 0, 0, 3, 0, 0, 0, 0],
+        "12": [0, 0, 0, 0, 3, 0, 0, 0, 0],
+        "13": [0, 0, 0, 0, 3, 0, 0, 0, 0],
+        "14": [0, 0, 0, 0, 3, 0, 0, 0, 0],
+        "15": [0, 0, 0, 0, 3, 0, 0, 0, 0],
+        "16": [0, 0, 0, 0, 3, 0, 0, 0, 0],
+        "17": [0, 0, 0, 0, 4, 0, 0, 0, 0],
+        "18": [0, 0, 0, 0, 4, 0, 0, 0, 0],
+        "19": [0, 0, 0, 0, 4, 0, 0, 0, 0],
+        "20": [0, 0, 0, 0, 4, 0, 0, 0, 0]
+      },
+      "wizard": {
+        "1": [2, 0, 0, 0, 0, 0, 0, 0, 0],
+        "2": [3, 0, 0, 0, 0, 0, 0, 0, 0],
+        "3": [4, 2, 0, 0, 0, 0, 0, 0, 0],
+        "4": [4, 3, 0, 0, 0, 0, 0, 0, 0],
+        "5": [4, 3, 2, 0, 0, 0, 0, 0, 0],
+        "6": [4, 3, 3, 0, 0, 0, 0, 0, 0],
+        "7": [4, 3, 3, 1, 0, 0, 0, 0, 0],
+        "8": [4, 3, 3, 2, 0, 0, 0, 0, 0],
+        "9": [4, 3, 3, 3, 1, 0, 0, 0, 0],
+        "10": [4, 3, 3, 3, 2, 0, 0, 0, 0],
+        "11": [4, 3, 3, 3, 2, 1, 0, 0, 0],
+        "12": [4, 3, 3, 3, 2, 1, 0, 0, 0],
+        "13": [4, 3, 3, 3, 2, 1, 1, 0, 0],
+        "14": [4, 3, 3, 3, 2, 1, 1, 0, 0],
+        "15": [4, 3, 3, 3, 2, 1, 1, 1, 0],
+        "16": [4, 3, 3, 3, 2, 1, 1, 1, 0],
+        "17": [4, 3, 3, 3, 2, 1, 1, 1, 1],
+        "18": [4, 3, 3, 3, 3, 1, 1, 1, 1],
+        "19": [4, 3, 3, 3, 3, 2, 1, 1, 1],
+        "20": [4, 3, 3, 3, 3, 2, 2, 1, 1]
+      }
+    },
+    "class_strategies": {
+      "default": {
+        "base_weight": 1.0,
+        "prefer_highest_level_weight": 0.6,
+        "expanded_spell_bonus": 2.0,
+        "first_concentration_bonus": 2.4,
+        "extra_concentration_penalty": 0.9,
+        "missing_healing_bonus": 2.2,
+        "missing_control_bonus": 1.6,
+        "first_ritual_bonus": 1.1,
+        "low_level_penalty": 0.15,
+        "replacement_threshold": 1.5,
+        "category_weights": {
+          "attack": 0.9,
+          "concentration": 0.8,
+          "control": 1.0,
+          "damage": 0.9,
+          "healing": 0.9,
+          "ritual": 0.4,
+          "save": 0.8,
+          "utility": 0.6
+        }
+      },
+      "bard": {
+        "expanded_spell_bonus": 1.5,
+        "category_weights": {
+          "attack": 0.4,
+          "concentration": 1.2,
+          "control": 1.4,
+          "damage": 0.5,
+          "healing": 1.1,
+          "ritual": 0.7,
+          "save": 1.0,
+          "utility": 1.0
+        }
+      },
+      "cleric": {
+        "category_weights": {
+          "attack": 0.5,
+          "concentration": 1.0,
+          "control": 1.0,
+          "damage": 0.8,
+          "healing": 1.6,
+          "ritual": 0.8,
+          "save": 0.9,
+          "utility": 0.9
+        }
+      },
+      "druid": {
+        "category_weights": {
+          "attack": 0.5,
+          "concentration": 1.3,
+          "control": 1.4,
+          "damage": 0.8,
+          "healing": 1.3,
+          "ritual": 0.9,
+          "save": 1.0,
+          "utility": 0.9
+        }
+      },
+      "paladin": {
+        "expanded_spell_bonus": 2.4,
+        "category_weights": {
+          "attack": 0.6,
+          "concentration": 1.2,
+          "control": 0.8,
+          "damage": 0.9,
+          "healing": 1.3,
+          "ritual": 0.1,
+          "save": 0.7,
+          "utility": 0.8
+        }
+      },
+      "ranger": {
+        "category_weights": {
+          "attack": 0.9,
+          "concentration": 1.2,
+          "control": 0.9,
+          "damage": 1.1,
+          "healing": 0.8,
+          "ritual": 0.2,
+          "save": 0.7,
+          "utility": 0.8
+        }
+      },
+      "sorcerer": {
+        "category_weights": {
+          "attack": 1.0,
+          "concentration": 0.9,
+          "control": 1.1,
+          "damage": 1.3,
+          "healing": 0.2,
+          "ritual": 0.0,
+          "save": 1.0,
+          "utility": 0.7
+        }
+      },
+      "warlock": {
+        "expanded_spell_bonus": 2.8,
+        "category_weights": {
+          "attack": 1.3,
+          "concentration": 0.9,
+          "control": 1.1,
+          "damage": 1.4,
+          "healing": 0.1,
+          "ritual": 0.4,
+          "save": 0.9,
+          "utility": 0.8
+        }
+      },
+      "wizard": {
+        "category_weights": {
+          "attack": 0.9,
+          "concentration": 1.0,
+          "control": 1.3,
+          "damage": 1.0,
+          "healing": 0.0,
+          "ritual": 1.1,
+          "save": 1.1,
+          "utility": 1.1
+        }
+      }
+    }
+  }
+}
