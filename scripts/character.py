@@ -1586,9 +1586,15 @@ class Character:
         """
         print(character_sheet)
 
+    def output_pdf_basename(self):
+        safe_name = self.name.replace(' ', '_')
+        safe_species = self.species.replace(' ', '_')
+        safe_class = self.char_class.replace(' ', '_').capitalize()
+        return f"{safe_name}_{safe_species}_{safe_class}_Level_{self.level}_Character Sheet.pdf"
+
     def create_pdf_file(self, font_name=None, spellbook=None, spellcards=False):
         input_pdf_filename = "./Character Sheet.pdf"
-        output_pdf_filename = f"./{self.name.replace(' ', '_')}_Character_Sheet.pdf"
+        output_pdf_filename = f"./{self.output_pdf_basename()}"
         urllib.request.urlretrieve(
             "https://media.wizards.com/2022/dnd/downloads/DnD_5E_CharacterSheet_FormFillable.pdf",
             input_pdf_filename

@@ -685,7 +685,7 @@ class GeneratorApp:
                         spellcards=self.spellcards_box.checked,
                     )
                     output_chunks.append(
-                        f"Saved PDF: {char_obj.name.replace(' ', '_')}_Character_Sheet.pdf"
+                        f"Saved PDF: {char_obj.output_pdf_basename()}"
                     )
             else:
                 for index in range(requested_count):
@@ -714,7 +714,7 @@ class GeneratorApp:
                         spellcards=self.spellcards_box.checked,
                     )
                     output_chunks.append(
-                        f"Saved PDF: {char_obj.name.replace(' ', '_')}_Character_Sheet.pdf"
+                        f"Saved PDF: {char_obj.output_pdf_basename()}"
                     )
 
             self.append_output("\n".join(output_chunks))
