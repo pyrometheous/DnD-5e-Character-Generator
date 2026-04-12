@@ -1,0 +1,35 @@
+{
+  "bard": [
+    "Spellcasting: slots refresh on long rest.",
+    "Known-spell caster: choose spells learned on level-up."
+  ],
+  "cleric": [
+    "Spellcasting: slots refresh on long rest.",
+    "Prepared caster: prepare spells each day from the cleric list."
+  ],
+  "druid": [
+    "Spellcasting: slots refresh on long rest.",
+    "Prepared caster: prepare spells each day from the druid list."
+  ],
+  "paladin": [
+    "Spellcasting: slots refresh on long rest.",
+    "Half-caster progression: fewer slots than full casters."
+  ],
+  "ranger": [
+    "Spellcasting: slots refresh on long rest.",
+    "Half-caster progression: fewer slots than full casters."
+  ],
+  "sorcerer": [
+    "Spellcasting: slots refresh on long rest.",
+    "Flexible Casting: sorcery points can create or convert spell slots."
+  ],
+  "warlock": [
+    "Pact Magic: slots refresh on short rest.",
+    "At high levels, warlock uses 5th-level pact slots.",
+    "Mystic Arcanum handles 6th-9th level spells (1/long rest each)."
+  ],
+  "wizard": [
+    "Spellcasting: slots refresh on long rest.",
+    "Arcane Recovery restores some slots on a short rest (once/day)."
+  ]
+}

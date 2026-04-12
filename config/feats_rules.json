@@ -1,0 +1,402 @@
+{
+  "selection": {
+    "asi_base_weight": 4.5,
+    "asi_sub_ten_multiplier": 1.8,
+    "asi_spellcasting_multiplier": 1.25,
+    "asi_odd_score_multiplier": 1.15,
+    "class_affinity_multiplier": 1.6,
+    "class_mismatch_multiplier": 0.55,
+    "species_affinity_multiplier": 1.25,
+    "magic_feat_multiplier": 1.8,
+    "martial_feat_multiplier": 1.45,
+    "spellcaster_martial_penalty": 0.2,
+    "martial_magic_penalty": 0.6,
+    "stealth_feat_multiplier": 1.3,
+    "under_ten_alignment_multiplier": 1.9,
+    "ability_alignment_multiplier": 1.45,
+    "redundant_grant_multiplier": 0.35,
+    "max_feats_per_character": 4,
+    "level_multipliers": {
+      "4": 1.0,
+      "6": 1.0,
+      "8": 1.0,
+      "10": 0.95,
+      "12": 0.95,
+      "14": 0.9,
+      "16": 0.85,
+      "19": 0.8
+    }
+  },
+  "feats": [
+    {
+      "name": "Alert",
+      "weight": 0.95,
+      "tags": ["awareness", "initiative"],
+      "class_affinity": ["rogue", "ranger", "wizard"]
+    },
+    {
+      "name": "Actor",
+      "weight": 0.95,
+      "tags": ["social"],
+      "class_affinity": ["bard", "warlock", "sorcerer", "paladin"],
+      "species_affinity": ["half_elf", "tiefling"],
+      "ability_bonus_options": ["charisma"]
+    },
+    {
+      "name": "Athlete",
+      "weight": 0.85,
+      "tags": ["martial", "mobility"],
+      "class_affinity": ["fighter", "barbarian", "ranger", "monk"],
+      "ability_bonus_options": ["strength", "dexterity"]
+    },
+    {
+      "name": "Charger",
+      "weight": 0.75,
+      "tags": ["martial", "mobility"],
+      "class_affinity": ["fighter", "barbarian", "paladin"]
+    },
+    {
+      "name": "Crossbow Expert",
+      "weight": 0.9,
+      "tags": ["martial", "ranged"],
+      "class_affinity": ["fighter", "ranger", "rogue"]
+    },
+    {
+      "name": "Defensive Duelist",
+      "weight": 0.75,
+      "tags": ["martial", "defense"],
+      "class_affinity": ["rogue", "bard", "fighter"]
+    },
+    {
+      "name": "Dual Wielder",
+      "weight": 0.75,
+      "tags": ["martial"],
+      "class_affinity": ["fighter", "ranger", "rogue"]
+    },
+    {
+      "name": "Dungeon Delver",
+      "weight": 0.7,
+      "tags": ["exploration", "awareness"],
+      "class_affinity": ["rogue", "ranger", "fighter"]
+    },
+    {
+      "name": "Durable",
+      "weight": 0.95,
+      "tags": ["defense", "survival"],
+      "class_affinity": ["barbarian", "fighter", "paladin"],
+      "species_affinity": ["dwarf"],
+      "ability_bonus_options": ["constitution"]
+    },
+    {
+      "name": "Elemental Adept",
+      "weight": 0.9,
+      "repeatable": true,
+      "tags": ["magic", "damage"],
+      "class_affinity": ["wizard", "sorcerer", "warlock", "druid", "cleric"],
+      "species_affinity": ["tiefling"],
+      "prerequisites": {
+        "spellcasting": true
+      },
+      "grants": {
+        "damage_type_choices": ["acid", "cold", "fire", "lightning", "thunder"]
+      }
+    },
+    {
+      "name": "Grappler",
+      "weight": 0.65,
+      "tags": ["martial", "control"],
+      "class_affinity": ["barbarian", "fighter", "monk"],
+      "species_affinity": ["half_orc"],
+      "prerequisites": {
+        "ability": {
+          "strength": 13
+        }
+      }
+    },
+    {
+      "name": "Great Weapon Master",
+      "weight": 1.0,
+      "tags": ["martial", "damage"],
+      "class_affinity": ["barbarian", "fighter", "paladin"]
+    },
+    {
+      "name": "Healer",
+      "weight": 0.85,
+      "tags": ["support", "healing"],
+      "class_affinity": ["cleric", "druid", "bard", "paladin", "ranger"]
+    },
+    {
+      "name": "Heavily Armored",
+      "weight": 0.95,
+      "tags": ["martial", "armor", "defense"],
+      "class_affinity": ["cleric", "fighter", "paladin"],
+      "species_affinity": ["dwarf"],
+      "prerequisites": {
+        "proficiencies_all": ["Medium Armor"]
+      },
+      "ability_bonus_options": ["strength"],
+      "grants": {
+        "proficiencies": ["Heavy Armor"]
+      }
+    },
+    {
+      "name": "Heavy Armor Master",
+      "weight": 0.9,
+      "tags": ["martial", "armor", "defense"],
+      "class_affinity": ["fighter", "paladin"],
+      "species_affinity": ["dwarf"],
+      "prerequisites": {
+        "proficiencies_all": ["Heavy Armor"]
+      },
+      "ability_bonus_options": ["strength"]
+    },
+    {
+      "name": "Inspiring Leader",
+      "weight": 0.9,
+      "tags": ["support", "leadership", "social"],
+      "class_affinity": ["bard", "paladin", "warlock", "sorcerer"],
+      "species_affinity": ["half_elf", "human", "dragonborn"],
+      "prerequisites": {
+        "ability": {
+          "charisma": 13
+        }
+      }
+    },
+    {
+      "name": "Keen Mind",
+      "weight": 0.9,
+      "tags": ["knowledge"],
+      "class_affinity": ["wizard", "cleric", "druid", "rogue"],
+      "species_affinity": ["gnome"],
+      "ability_bonus_options": ["intelligence"]
+    },
+    {
+      "name": "Lightly Armored",
+      "weight": 0.75,
+      "tags": ["armor", "defense"],
+      "class_affinity": ["wizard", "sorcerer", "warlock"],
+      "ability_bonus_options": ["strength", "dexterity"],
+      "grants": {
+        "proficiencies": ["Light Armor"]
+      }
+    },
+    {
+      "name": "Linguist",
+      "weight": 0.8,
+      "tags": ["knowledge", "social"],
+      "class_affinity": ["wizard", "bard", "rogue"],
+      "species_affinity": ["gnome"],
+      "ability_bonus_options": ["intelligence"],
+      "grants": {
+        "language_choices": 3
+      }
+    },
+    {
+      "name": "Lucky",
+      "weight": 1.1,
+      "tags": ["general"],
+      "class_affinity": ["rogue", "bard", "fighter"],
+      "species_affinity": ["halfling"]
+    },
+    {
+      "name": "Mage Slayer",
+      "weight": 0.8,
+      "tags": ["martial", "anti_magic"],
+      "class_affinity": ["fighter", "paladin", "ranger", "monk"]
+    },
+    {
+      "name": "Magic Initiate",
+      "weight": 1.0,
+      "tags": ["magic"],
+      "class_affinity": ["bard", "cleric", "druid", "paladin", "ranger", "rogue", "sorcerer", "warlock", "wizard"],
+      "species_affinity": ["tiefling", "gnome", "elf"],
+      "grants": {
+        "magic_class_choices": ["bard", "cleric", "druid", "sorcerer", "warlock", "wizard"]
+      }
+    },
+    {
+      "name": "Martial Adept",
+      "weight": 0.8,
+      "tags": ["martial"],
+      "class_affinity": ["fighter", "paladin", "ranger", "barbarian"]
+    },
+    {
+      "name": "Medium Armor Master",
+      "weight": 0.75,
+      "tags": ["armor", "defense", "stealth"],
+      "class_affinity": ["ranger", "cleric", "fighter"],
+      "prerequisites": {
+        "proficiencies_all": ["Medium Armor"]
+      }
+    },
+    {
+      "name": "Mobile",
+      "weight": 0.95,
+      "tags": ["mobility", "stealth"],
+      "class_affinity": ["monk", "rogue", "ranger", "barbarian"],
+      "species_affinity": ["elf", "halfling"],
+      "grants": {
+        "speed_bonus": 10
+      }
+    },
+    {
+      "name": "Moderately Armored",
+      "weight": 0.85,
+      "tags": ["armor", "defense"],
+      "class_affinity": ["bard", "warlock", "rogue", "wizard", "sorcerer"],
+      "prerequisites": {
+        "proficiencies_all": ["Light Armor"]
+      },
+      "ability_bonus_options": ["strength", "dexterity"],
+      "grants": {
+        "proficiencies": ["Medium Armor", "Shields"]
+      }
+    },
+    {
+      "name": "Mounted Combatant",
+      "weight": 0.65,
+      "tags": ["martial"],
+      "class_affinity": ["paladin", "fighter", "ranger"]
+    },
+    {
+      "name": "Observant",
+      "weight": 0.95,
+      "tags": ["awareness", "knowledge"],
+      "class_affinity": ["wizard", "cleric", "druid", "rogue", "ranger"],
+      "species_affinity": ["elf", "gnome"],
+      "ability_bonus_options": ["intelligence", "wisdom"],
+      "grants": {
+        "passive_perception_bonus": 5
+      }
+    },
+    {
+      "name": "Polearm Master",
+      "weight": 0.85,
+      "tags": ["martial", "control"],
+      "class_affinity": ["fighter", "paladin", "barbarian"]
+    },
+    {
+      "name": "Resilient",
+      "weight": 1.0,
+      "tags": ["defense", "general"],
+      "class_affinity": ["wizard", "sorcerer", "fighter", "rogue", "ranger", "paladin"],
+      "species_affinity": ["human"],
+      "ability_bonus_options": ["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"],
+      "grants": {
+        "saving_throw_choice": true
+      }
+    },
+    {
+      "name": "Ritual Caster",
+      "weight": 0.85,
+      "tags": ["magic", "knowledge"],
+      "class_affinity": ["wizard", "cleric", "druid", "bard", "rogue"],
+      "prerequisites": {
+        "ability_any_of": {
+          "intelligence": 13,
+          "wisdom": 13
+        }
+      },
+      "grants": {
+        "magic_class_choices": ["bard", "cleric", "druid", "sorcerer", "warlock", "wizard"]
+      }
+    },
+    {
+      "name": "Savage Attacker",
+      "weight": 0.7,
+      "tags": ["martial", "damage"],
+      "class_affinity": ["barbarian", "fighter", "paladin"],
+      "species_affinity": ["half_orc"]
+    },
+    {
+      "name": "Sentinel",
+      "weight": 0.95,
+      "tags": ["martial", "control"],
+      "class_affinity": ["fighter", "paladin", "barbarian"]
+    },
+    {
+      "name": "Sharpshooter",
+      "weight": 1.0,
+      "tags": ["martial", "ranged"],
+      "class_affinity": ["fighter", "ranger", "rogue"]
+    },
+    {
+      "name": "Shield Master",
+      "weight": 0.8,
+      "tags": ["martial", "defense"],
+      "class_affinity": ["fighter", "paladin", "cleric"],
+      "prerequisites": {
+        "proficiencies_all": ["Shields"]
+      }
+    },
+    {
+      "name": "Skilled",
+      "weight": 0.9,
+      "tags": ["skill", "utility"],
+      "class_affinity": ["bard", "rogue", "ranger", "cleric"],
+      "species_affinity": ["human", "half_elf"],
+      "grants": {
+        "skill_or_tool_choices": 3
+      }
+    },
+    {
+      "name": "Skulker",
+      "weight": 0.8,
+      "tags": ["stealth"],
+      "class_affinity": ["rogue", "ranger", "monk"],
+      "species_affinity": ["elf", "halfling"],
+      "prerequisites": {
+        "ability": {
+          "dexterity": 13
+        }
+      }
+    },
+    {
+      "name": "Spell Sniper",
+      "weight": 0.95,
+      "tags": ["magic", "ranged"],
+      "class_affinity": ["wizard", "warlock", "sorcerer", "cleric", "druid"]
+    },
+    {
+      "name": "Tavern Brawler",
+      "weight": 0.7,
+      "tags": ["martial"],
+      "class_affinity": ["barbarian", "fighter", "monk", "rogue"],
+      "species_affinity": ["half_orc"],
+      "ability_bonus_options": ["strength", "constitution"],
+      "grants": {
+        "proficiencies": ["Improvised Weapons"]
+      }
+    },
+    {
+      "name": "Tough",
+      "weight": 1.0,
+      "tags": ["defense", "survival"],
+      "class_affinity": ["barbarian", "fighter", "paladin", "ranger"],
+      "species_affinity": ["dwarf"],
+      "grants": {
+        "hp_per_level_bonus": 2
+      }
+    },
+    {
+      "name": "War Caster",
+      "weight": 1.0,
+      "tags": ["magic", "defense"],
+      "class_affinity": ["cleric", "druid", "paladin", "warlock", "wizard", "sorcerer", "bard"],
+      "species_affinity": ["tiefling"],
+      "prerequisites": {
+        "spellcasting": true
+      }
+    },
+    {
+      "name": "Weapon Master",
+      "weight": 0.8,
+      "tags": ["martial"],
+      "class_affinity": ["wizard", "sorcerer", "warlock", "bard", "rogue"],
+      "ability_bonus_options": ["strength", "dexterity"],
+      "grants": {
+        "weapon_choices": 4
+      }
+    }
+  ]
+}

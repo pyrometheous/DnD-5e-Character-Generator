@@ -1,0 +1,102 @@
+{
+  "global": {
+    "class_primary_weight": 220,
+    "class_secondary_weight": 95,
+    "spellcasting_weight": 115,
+    "species_weight_scale": 20,
+    "under_cap_weight": 1,
+    "odd_score_weight": 14,
+    "sub_ten_weight": 90,
+    "important_below_floor_weight": 130,
+    "important_floor_target": 14,
+    "important_floor_trigger": 10,
+    "force_asi_when_important_below_floor": true
+  },
+  "class_priorities": {
+    "barbarian": {
+      "primary": ["strength", "constitution"],
+      "secondary": ["dexterity", "wisdom"]
+    },
+    "bard": {
+      "primary": ["charisma"],
+      "secondary": ["dexterity", "constitution"]
+    },
+    "cleric": {
+      "primary": ["wisdom"],
+      "secondary": ["constitution", "strength"]
+    },
+    "druid": {
+      "primary": ["wisdom"],
+      "secondary": ["constitution", "dexterity"]
+    },
+    "fighter": {
+      "primary": ["strength", "constitution"],
+      "secondary": ["dexterity", "wisdom"]
+    },
+    "monk": {
+      "primary": ["dexterity", "wisdom"],
+      "secondary": ["constitution"]
+    },
+    "paladin": {
+      "primary": ["charisma", "strength"],
+      "secondary": ["constitution", "wisdom"]
+    },
+    "ranger": {
+      "primary": ["dexterity", "wisdom"],
+      "secondary": ["constitution"]
+    },
+    "rogue": {
+      "primary": ["dexterity"],
+      "secondary": ["constitution", "wisdom", "intelligence"]
+    },
+    "sorcerer": {
+      "primary": ["charisma"],
+      "secondary": ["constitution", "dexterity"]
+    },
+    "warlock": {
+      "primary": ["charisma"],
+      "secondary": ["constitution", "dexterity"]
+    },
+    "wizard": {
+      "primary": ["intelligence"],
+      "secondary": ["constitution", "dexterity"]
+    }
+  },
+  "species_modifiers": {
+    "human": {
+      "strength": 1,
+      "dexterity": 1,
+      "constitution": 1,
+      "intelligence": 1,
+      "wisdom": 1,
+      "charisma": 1
+    },
+    "elf": {
+      "dexterity": 2
+    },
+    "halfling": {
+      "dexterity": 2
+    },
+    "dwarf": {
+      "constitution": 2
+    },
+    "gnome": {
+      "intelligence": 2
+    },
+    "half_elf": {
+      "charisma": 2
+    },
+    "dragonborn": {
+      "strength": 2,
+      "charisma": 1
+    },
+    "tiefling": {
+      "charisma": 2,
+      "intelligence": 1
+    },
+    "half_orc": {
+      "strength": 2,
+      "constitution": 1
+    }
+  }
+}

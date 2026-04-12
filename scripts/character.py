@@ -125,6 +125,11 @@ SPELL_SLOT_FIELD_MAP = {
     9: 'SlotsTotal 27',
 }
 
+ALL_ABILITIES = [
+    'strength', 'dexterity', 'constitution',
+    'intelligence', 'wisdom', 'charisma',
+]
+
 # Feature indices that grant Expertise (double proficiency on chosen skills)
 # and how many skill choices each grants.
 EXPERTISE_FEATURE_INDICES = {
@@ -180,7 +185,80 @@ def load_spellcasting_notes(config_path=None):
     return notes
 
 
+def load_asi_weight_config(config_path=None):
+    """Load class/species ASI weighting rules from JSON config."""
+    default_config = {
+        'global': {
+            'class_primary_weight': 220,
+            'class_secondary_weight': 95,
+            'spellcasting_weight': 115,
+            'species_weight_scale': 20,
+            'under_cap_weight': 1,
+            'odd_score_weight': 14,
+            'sub_ten_weight': 90,
+            'important_below_floor_weight': 130,
+            'important_floor_target': 14,
+            'important_floor_trigger': 10,
+            'force_asi_when_important_below_floor': True,
+        },
+        'class_priorities': {},
+        'species_modifiers': {},
+    }
+
+    target_path = config_path or os.path.join(BASE_DIR, 'config', 'ability_score_weights.json')
+    if not os.path.exists(target_path):
+        return default_config
+
+    try:
+        with open(target_path, 'r', encoding='utf-8') as handle:
+            loaded = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return default_config
+
+    if not isinstance(loaded, dict):
+        return default_config
+
+    config = {
+        'global': dict(default_config['global']),
+        'class_priorities': dict(default_config['class_priorities']),
+        'species_modifiers': dict(default_config['species_modifiers']),
+    }
+
+    global_cfg = loaded.get('global', {})
+    if isinstance(global_cfg, dict):
+        for key, value in global_cfg.items():
+            if key in config['global'] and isinstance(value, (int, float, bool)):
+                config['global'][key] = value
+
+    class_cfg = loaded.get('class_priorities', {})
+    if isinstance(class_cfg, dict):
+        for class_name, priority_data in class_cfg.items():
+            if not isinstance(class_name, str) or not isinstance(priority_data, dict):
+                continue
+            normalized = class_name.strip().lower()
+            config['class_priorities'][normalized] = {
+                'primary': [a for a in priority_data.get('primary', []) if a in ALL_ABILITIES],
+                'secondary': [a for a in priority_data.get('secondary', []) if a in ALL_ABILITIES],
+            }
+
+    species_cfg = loaded.get('species_modifiers', {})
+    if isinstance(species_cfg, dict):
+        for species_name, weights in species_cfg.items():
+            if not isinstance(species_name, str) or not isinstance(weights, dict):
+                continue
+            normalized_species = species_name.strip().lower()
+            cleaned = {}
+            for ability, weight in weights.items():
+                if ability in ALL_ABILITIES and isinstance(weight, (int, float)):
+                    cleaned[ability] = float(weight)
+            if cleaned:
+                config['species_modifiers'][normalized_species] = cleaned
+
+    return config
+
+
 SPELLCASTING_NOTES = load_spellcasting_notes()
+ASI_WEIGHT_CONFIG = load_asi_weight_config()
 FEAT_CONFIG = load_feat_config()
 
 
@@ -212,6 +290,7 @@ class Character:
         self.initiative_bonus = 0
         self.passive_perception_bonus = 0
         self.hp_bonus_per_level = 0
+        self.aggressive_asi_focus = set()
         self.proficiencies = []
         self.equipment = []
         self.saving_throw_proficiencies = [
@@ -335,11 +414,18 @@ class Character:
                     asi_levels.append(lvl)
 
         for asi_level in asi_levels:
-            selected_feat = choose_feat_for_character(self, asi_level, FEAT_CONFIG)
-            if selected_feat is not None:
-                self._apply_selected_feat(selected_feat)
-                self.advancement_log.append({'type': 'feat', 'feat': selected_feat})
-                continue
+            aggressive_focus = self._refresh_aggressive_asi_focus()
+            force_asi = bool(
+                ASI_WEIGHT_CONFIG['global'].get('force_asi_when_important_below_floor', True)
+                and aggressive_focus
+            )
+
+            if not force_asi:
+                selected_feat = choose_feat_for_character(self, asi_level, FEAT_CONFIG)
+                if selected_feat is not None:
+                    self._apply_selected_feat(selected_feat)
+                    self.advancement_log.append({'type': 'feat', 'feat': selected_feat})
+                    continue
 
             prefer_sc = (spellcast_ability
                          if (spellcast_ability and asi_level <= 15)
@@ -348,6 +434,7 @@ class Character:
             first, second = self._rank_asi_candidates(
                 prefer_spellcast_ability=prefer_sc,
                 prioritize_sub_ten=prioritize_sub_ten,
+                aggressive_focus=aggressive_focus,
             )
 
             asi_record = {}
@@ -359,7 +446,7 @@ class Character:
             self.asi_log.append(asi_record)
             self.advancement_log.append({'type': 'asi', 'ability_bonuses': asi_record})
 
-    def _rank_asi_candidates(self, prefer_spellcast_ability, prioritize_sub_ten=False):
+    def _rank_asi_candidates(self, prefer_spellcast_ability, prioritize_sub_ten=False, aggressive_focus=None):
         """Return (first, second) ability names for one ASI (+2 points total).
 
         first  — highest-priority target for the first +1 point
@@ -372,43 +459,121 @@ class Character:
           3) odd abilities (odd+1 = even -> +1 modifier step)
           4) any ability below cap
         """
-        all_abilities = ['strength', 'dexterity', 'constitution',
-                         'intelligence', 'wisdom', 'charisma']
-        under_cap = [a for a in all_abilities if getattr(self, a) < 20]
+        under_cap = [a for a in ALL_ABILITIES if getattr(self, a) < 20]
         if not under_cap:
             return None, None
 
-        below_ten_under_cap = [a for a in under_cap if getattr(self, a) < 10]
-        odd_under_cap = [a for a in under_cap if getattr(self, a) % 2 == 1]
+        first = self._best_asi_ability(
+            candidates=under_cap,
+            prefer_spellcast_ability=prefer_spellcast_ability,
+            prioritize_sub_ten=prioritize_sub_ten,
+            aggressive_focus=aggressive_focus,
+        )
 
-        # First point
-        if prioritize_sub_ten and below_ten_under_cap:
-            if prefer_spellcast_ability in below_ten_under_cap:
-                first = prefer_spellcast_ability
-            else:
-                first = random.choice(below_ten_under_cap)
-        elif prefer_spellcast_ability and prefer_spellcast_ability in under_cap:
-            first = prefer_spellcast_ability
-        elif odd_under_cap:
-            first = random.choice(odd_under_cap)
-        else:
-            first = random.choice(under_cap)
+        if first is None:
+            return None, None
 
-        other_under = [a for a in under_cap if a != first]
-        below_ten_other_under = [a for a in other_under if getattr(self, a) < 10]
-        odd_for_second = [a for a in odd_under_cap if a != first]
+        setattr(self, first, getattr(self, first) + 1)
+        try:
+            still_under_cap = [a for a in ALL_ABILITIES if getattr(self, a) < 20]
+            second_pool = still_under_cap or [first]
+            second = self._best_asi_ability(
+                candidates=second_pool,
+                prefer_spellcast_ability=prefer_spellcast_ability,
+                prioritize_sub_ten=prioritize_sub_ten,
+                aggressive_focus=aggressive_focus,
+            )
+        finally:
+            setattr(self, first, getattr(self, first) - 1)
 
-        # Second point
-        if prioritize_sub_ten and below_ten_other_under:
-            second = random.choice(below_ten_other_under)
-        elif odd_for_second:
-            second = random.choice(odd_for_second)
-        elif other_under:
-            second = random.choice(other_under)
-        else:
+        if second is None:
             second = first
 
         return first, second
+
+    def _important_abilities(self, prefer_spellcast_ability=None, primary_only=False):
+        class_cfg = ASI_WEIGHT_CONFIG.get('class_priorities', {}).get(self.char_class, {})
+        primary = class_cfg.get('primary', [])
+        secondary = [] if primary_only else class_cfg.get('secondary', [])
+
+        ordered = []
+        for ability in primary + secondary:
+            if ability in ALL_ABILITIES and ability not in ordered:
+                ordered.append(ability)
+        if prefer_spellcast_ability and prefer_spellcast_ability in ALL_ABILITIES and prefer_spellcast_ability not in ordered:
+            ordered.append(prefer_spellcast_ability)
+        return ordered
+
+    def _refresh_aggressive_asi_focus(self):
+        cfg = ASI_WEIGHT_CONFIG.get('global', {})
+        trigger = int(cfg.get('important_floor_trigger', 10))
+        floor = int(cfg.get('important_floor_target', 14))
+        important = self._important_abilities(
+            SPELLCASTING_ABILITY.get(self.char_class),
+            primary_only=True,
+        )
+
+        if not self.aggressive_asi_focus:
+            for ability in important:
+                if getattr(self, ability) < trigger:
+                    self.aggressive_asi_focus.add(ability)
+
+        self.aggressive_asi_focus = {
+            ability for ability in self.aggressive_asi_focus
+            if getattr(self, ability) < floor and getattr(self, ability) < 20
+        }
+        return set(self.aggressive_asi_focus)
+
+    def _ability_investment_score(self, ability, prefer_spellcast_ability, prioritize_sub_ten, aggressive_focus):
+        cfg = ASI_WEIGHT_CONFIG.get('global', {})
+        class_cfg = ASI_WEIGHT_CONFIG.get('class_priorities', {}).get(self.char_class, {})
+        species_cfg = ASI_WEIGHT_CONFIG.get('species_modifiers', {}).get(self.species.lower(), {})
+
+        current = getattr(self, ability)
+        score = 0.0
+
+        if ability in class_cfg.get('primary', []):
+            score += float(cfg.get('class_primary_weight', 0))
+        if ability in class_cfg.get('secondary', []):
+            score += float(cfg.get('class_secondary_weight', 0))
+        if prefer_spellcast_ability and ability == prefer_spellcast_ability:
+            score += float(cfg.get('spellcasting_weight', 0))
+
+        score += float(species_cfg.get(ability, 0)) * float(cfg.get('species_weight_scale', 0))
+        score += max(0, 20 - current) * float(cfg.get('under_cap_weight', 0))
+
+        if current % 2 == 1:
+            score += float(cfg.get('odd_score_weight', 0))
+        if prioritize_sub_ten and current < 10:
+            score += float(cfg.get('sub_ten_weight', 0))
+
+        floor = int(cfg.get('important_floor_target', 14))
+        if ability in aggressive_focus and current < floor:
+            score += float(cfg.get('important_below_floor_weight', 0)) * (floor - current)
+
+        return score
+
+    def _best_asi_ability(self, candidates, prefer_spellcast_ability, prioritize_sub_ten, aggressive_focus):
+        if not candidates:
+            return None
+
+        aggressive_focus = aggressive_focus or set()
+
+        best = None
+        best_score = None
+        for ability in ALL_ABILITIES:
+            if ability not in candidates:
+                continue
+            score = self._ability_investment_score(
+                ability=ability,
+                prefer_spellcast_ability=prefer_spellcast_ability,
+                prioritize_sub_ten=prioritize_sub_ten,
+                aggressive_focus=aggressive_focus,
+            )
+            if best is None or score > best_score:
+                best = ability
+                best_score = score
+        return best
 
     def apply_feat_ability_bonuses(self):
         """Apply any feat effects that were injected but not yet applied.
