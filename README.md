@@ -1,6 +1,13 @@
 # D&D 5e Character Generator (`DnD-5e-Character-Generator`)
 
-A command-line tool that generates random, rules-legal D&D 5th Edition characters (levels 1–20) and outputs filled PDF character sheets with fantasy fonts.
+A toolkit for generating random, rules-legal D&D 5th Edition characters (levels 1-20) and outputting filled PDF character sheets with fantasy fonts.
+
+## Documentation
+
+- [Documentation index](docs/README.md)
+- [GUI usage guide](docs/GUI_USAGE.md)
+- [CLI usage guide](docs/CLI_USAGE.md)
+- [GUI assets and credits](docs/GUI_ASSETS.md)
 
 ## Setup
 
@@ -16,7 +23,37 @@ cd DnD-5e-Character-Generator
 pip install -r requirements.txt
 ```
 
-## Usage
+## GUI Usage
+
+The desktop GUI launcher is `main.pyw`.
+
+Screenshot:
+
+![GUI Screenshot](media/Screenshot_20260411_200858.png)
+
+### Linux
+
+```bash
+python3 main.pyw
+```
+
+### macOS
+
+```bash
+python3 main.pyw
+```
+
+### Windows
+
+```powershell
+py main.pyw
+```
+
+You can also double-click `main.pyw` in Explorer if `.pyw` is associated with Python.
+
+For more detail, see [GUI usage guide](docs/GUI_USAGE.md).
+
+## CLI Usage
 
 ```bash
 python3 main.py [OPTIONS]
@@ -90,3 +127,5 @@ The PDF is based on the official WotC D&D 5E form-fillable character sheet and i
 If you use `--spellbook`, the generator fills the spell list on page 3 of the PDF with random class-appropriate 5e spells for the generated caster, without marking any spells as prepared. Redundancy filtering and species/class cross-check rules live in `config/spellbook_rules.json`, so you can tune them manually in the future.
 
 Balanced party templates and class-role tuning live in `config/party_balance_rules.json`, so you can manually fine-tune what combinations the generator prefers.
+
+For more detail, see [CLI usage guide](docs/CLI_USAGE.md).
