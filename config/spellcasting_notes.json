@@ -1,0 +1,184 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "owner": "DnD Character Generator",
+    "last_updated": "2026-04-11",
+    "purpose": "Controls spellcaster guidance text rendered in Additional Features and Traits on page 2.",
+    "examples": [
+      "Hide baseline spell math block: set global_rules.include_spell_use_basics to false.",
+      "Support homebrew feat name variants: add feat_note_rules.aliases entries."
+    ],
+    "notes": [
+      "This file is strict JSON. Use _meta fields for documentation instead of // comments.",
+      "global_rules: master toggles for baseline guidance blocks.",
+      "class_rules: class-specific logic controlling formula and line inclusion.",
+      "class_notes/feat_notes/species_notes: custom narrative guidance lines.",
+      "feat_note_rules: canonical feat-name matching, aliases, and fallback behavior.",
+      "templates: text templates with placeholders like {save_dc}, {attack_bonus}, {prepared_count}."
+    ]
+  },
+  "global_rules": {
+    "include_spell_use_basics": true,
+    "include_species_trait_spellcasting_hint": true
+  },
+  "class_rules": {
+    "bard": {
+      "prepared_formula": "none",
+      "resource_refresh": "long_rest",
+      "show_cantrips_known": true,
+      "show_spells_known": true,
+      "include_prepared_rest_reminder": false,
+      "include_mystic_arcanum": false
+    },
+    "cleric": {
+      "prepared_formula": "level_plus_mod",
+      "resource_refresh": "long_rest",
+      "show_cantrips_known": true,
+      "show_spells_known": false,
+      "include_prepared_rest_reminder": true,
+      "include_mystic_arcanum": false
+    },
+    "druid": {
+      "prepared_formula": "level_plus_mod",
+      "resource_refresh": "long_rest",
+      "show_cantrips_known": true,
+      "show_spells_known": false,
+      "include_prepared_rest_reminder": true,
+      "include_mystic_arcanum": false
+    },
+    "paladin": {
+      "prepared_formula": "half_level_plus_mod",
+      "resource_refresh": "long_rest",
+      "show_cantrips_known": false,
+      "show_spells_known": false,
+      "include_prepared_rest_reminder": false,
+      "include_mystic_arcanum": false
+    },
+    "ranger": {
+      "prepared_formula": "none",
+      "resource_refresh": "long_rest",
+      "show_cantrips_known": false,
+      "show_spells_known": true,
+      "include_prepared_rest_reminder": false,
+      "include_mystic_arcanum": false
+    },
+    "sorcerer": {
+      "prepared_formula": "none",
+      "resource_refresh": "long_rest",
+      "show_cantrips_known": true,
+      "show_spells_known": true,
+      "include_prepared_rest_reminder": false,
+      "include_mystic_arcanum": false
+    },
+    "warlock": {
+      "prepared_formula": "none",
+      "resource_refresh": "warlock",
+      "show_cantrips_known": true,
+      "show_spells_known": true,
+      "include_prepared_rest_reminder": false,
+      "include_mystic_arcanum": true
+    },
+    "wizard": {
+      "prepared_formula": "wizard",
+      "resource_refresh": "long_rest",
+      "show_cantrips_known": true,
+      "show_spells_known": false,
+      "include_prepared_rest_reminder": false,
+      "include_mystic_arcanum": false
+    }
+  },
+  "class_notes": {
+    "bard": [
+      "Spellcasting: slots refresh on long rest.",
+      "Known-spell caster: choose spells learned on level-up."
+    ],
+    "cleric": [
+      "Spellcasting: slots refresh on long rest.",
+      "Prepared caster: prepare spells each day from the cleric list."
+    ],
+    "druid": [
+      "Spellcasting: slots refresh on long rest.",
+      "Prepared caster: prepare spells each day from the druid list."
+    ],
+    "paladin": [
+      "Spellcasting: slots refresh on long rest.",
+      "Half-caster progression: fewer slots than full casters."
+    ],
+    "ranger": [
+      "Spellcasting: slots refresh on long rest.",
+      "Half-caster progression: fewer slots than full casters."
+    ],
+    "sorcerer": [
+      "Spellcasting: slots refresh on long rest.",
+      "Flexible Casting: sorcery points can create or convert spell slots."
+    ],
+    "warlock": [
+      "Pact Magic: slots refresh on short rest.",
+      "At high levels, warlock uses 5th-level pact slots.",
+      "Mystic Arcanum handles 6th-9th level spells (1/long rest each)."
+    ],
+    "wizard": [
+      "Spellcasting: slots refresh on long rest.",
+      "Arcane Recovery restores some slots on a short rest (once/day)."
+    ]
+  },
+  "feat_note_rules": {
+    "match_mode": "exact_normalized",
+    "use_contains_fallback": true,
+    "aliases": {
+      "Magic Initiate": [
+        "Magic Initiate (Bard)",
+        "Magic Initiate (Cleric)",
+        "Magic Initiate (Druid)",
+        "Magic Initiate (Sorcerer)",
+        "Magic Initiate (Warlock)",
+        "Magic Initiate (Wizard)"
+      ],
+      "War Caster": [
+        "War-Caster",
+        "Warcaster"
+      ],
+      "Spell Sniper": [
+        "Spell-Sniper"
+      ]
+    }
+  },
+  "feat_notes": {
+    "Elemental Adept": [
+      "Elemental Adept: choose and focus on one damage type from your feat."
+    ],
+    "Magic Initiate": [
+      "Magic Initiate: one 1st-level spell can be cast once per long rest."
+    ],
+    "Ritual Caster": [
+      "Ritual Caster: ritual spells can be cast without expending slots if prepared in your ritual book."
+    ],
+    "Spell Sniper": [
+      "Spell Sniper: doubled range for attack-roll spells and more reliable cover targeting."
+    ],
+    "War Caster": [
+      "War Caster: advantage on concentration checks and can cast in place of opportunity attacks."
+    ]
+  },
+  "species_notes": {
+    "tiefling": [
+      "Species magic: tieflings may gain innate spells from racial traits."
+    ]
+  },
+  "templates": {
+    "spell_use_basics_header": "Spell Use Basics:",
+    "spellcasting_ability_line": "Spellcasting ability: {ability_name} ({ability_mod:+d}).",
+    "spell_save_dc_line": "Spell Save DC: {save_dc}.",
+    "spell_attack_bonus_line": "Spell Attack Bonus: +{attack_bonus}.",
+    "cantrips_known_line": "Cantrips known: {cantrips_known}.",
+    "spells_known_line": "Spells known from class: {spells_known}.",
+    "prepared_spells_line_cleric_druid": "Prepared spells each day: {prepared_count} ({level} + {ability_name_short} mod).",
+    "prepared_spells_line_wizard": "Prepared wizard spells each day: {prepared_count} ({level} + INT mod) from your spellbook.",
+    "prepared_spells_line_paladin": "Prepared paladin spells each day: {prepared_count} (level//2 + CHA mod).",
+    "prepared_after_long_rest_line": "After a long rest, choose prepared spells from your class list.",
+    "warlock_slots_refresh_line": "Pact slots refresh on a short or long rest.",
+    "mystic_arcanum_line": "Mystic Arcanum gained: {arcanum}.",
+    "long_rest_slots_refresh_line": "Class spell slots refresh on a long rest.",
+    "species_spellcasting_traits_line": "Species traits may grant additional spells; see your racial traits section."
+  }
+}

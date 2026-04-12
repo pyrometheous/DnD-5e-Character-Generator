@@ -1,0 +1,120 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "owner": "DnD Character Generator",
+    "last_updated": "2026-04-11",
+    "purpose": "Controls ASI investment priorities and aggressive floor behavior for ability scores.",
+    "examples": [
+      "Raise rogue Dexterity bias: increase class_priorities.rogue.primary emphasis via global.class_primary_weight.",
+      "Disable forced ASI floor recovery: set global.force_asi_when_important_below_floor to false."
+    ],
+    "notes": [
+      "This file is strict JSON. Use _meta fields for documentation instead of // comments.",
+      "global: tuning knobs for scoring each ASI candidate ability.",
+      "class_priorities: primary/secondary abilities per class (lowercase class keys).",
+      "species_modifiers: per-species ability weighting adjustments.",
+      "important_floor_trigger/floor_target: when a primary stat drops below trigger, ASIs can be forced until floor_target.",
+      "force_asi_when_important_below_floor: true disables feat picks while important stat recovery is in progress."
+    ]
+  },
+  "global": {
+    "class_primary_weight": 220,
+    "class_secondary_weight": 95,
+    "spellcasting_weight": 115,
+    "species_weight_scale": 20,
+    "under_cap_weight": 1,
+    "odd_score_weight": 14,
+    "sub_ten_weight": 90,
+    "important_below_floor_weight": 130,
+    "important_floor_target": 14,
+    "important_floor_trigger": 10,
+    "force_asi_when_important_below_floor": true
+  },
+  "class_priorities": {
+    "barbarian": {
+      "primary": ["strength", "constitution"],
+      "secondary": ["dexterity", "wisdom"]
+    },
+    "bard": {
+      "primary": ["charisma"],
+      "secondary": ["dexterity", "constitution"]
+    },
+    "cleric": {
+      "primary": ["wisdom"],
+      "secondary": ["constitution", "strength"]
+    },
+    "druid": {
+      "primary": ["wisdom"],
+      "secondary": ["constitution", "dexterity"]
+    },
+    "fighter": {
+      "primary": ["strength", "constitution"],
+      "secondary": ["dexterity", "wisdom"]
+    },
+    "monk": {
+      "primary": ["dexterity", "wisdom"],
+      "secondary": ["constitution"]
+    },
+    "paladin": {
+      "primary": ["charisma", "strength"],
+      "secondary": ["constitution", "wisdom"]
+    },
+    "ranger": {
+      "primary": ["dexterity", "wisdom"],
+      "secondary": ["constitution"]
+    },
+    "rogue": {
+      "primary": ["dexterity"],
+      "secondary": ["constitution", "wisdom", "intelligence"]
+    },
+    "sorcerer": {
+      "primary": ["charisma"],
+      "secondary": ["constitution", "dexterity"]
+    },
+    "warlock": {
+      "primary": ["charisma"],
+      "secondary": ["constitution", "dexterity"]
+    },
+    "wizard": {
+      "primary": ["intelligence"],
+      "secondary": ["constitution", "dexterity"]
+    }
+  },
+  "species_modifiers": {
+    "human": {
+      "strength": 1,
+      "dexterity": 1,
+      "constitution": 1,
+      "intelligence": 1,
+      "wisdom": 1,
+      "charisma": 1
+    },
+    "elf": {
+      "dexterity": 2
+    },
+    "halfling": {
+      "dexterity": 2
+    },
+    "dwarf": {
+      "constitution": 2
+    },
+    "gnome": {
+      "intelligence": 2
+    },
+    "half_elf": {
+      "charisma": 2
+    },
+    "dragonborn": {
+      "strength": 2,
+      "charisma": 1
+    },
+    "tiefling": {
+      "charisma": 2,
+      "intelligence": 1
+    },
+    "half_orc": {
+      "strength": 2,
+      "constitution": 1
+    }
+  }
+}

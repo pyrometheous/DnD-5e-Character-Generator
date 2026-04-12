@@ -600,7 +600,7 @@ class GeneratorApp:
             ),
             f"Skill Proficiencies: {', '.join(char_obj.skill_proficiencies) or 'None'}",
             f"Languages: {', '.join(char_obj.get_languages())}",
-            f"Features: {', '.join(char_obj.get_features())}",
+            f"Features: {', '.join(char_obj.get_features_annotated())}",
         ]
         return "\n".join(lines)
 

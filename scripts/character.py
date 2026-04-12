@@ -1,8 +1,10 @@
 from scripts import roll
+from scripts.feats import choose_feat_for_character, load_feat_config
 
 from tinys_srd import Classes, Equipment, Proficiencies, Levels
 from tinys_srd import Races as Species
 
+import json
 import random
 import re
 import io
@@ -75,6 +77,178 @@ SPELLCASTING_ABILITY = {
     'warlock': 'charisma', 'wizard': 'intelligence',
 }
 
+DEFAULT_SPELLCASTING_GUIDANCE = {
+    'global_rules': {
+        'include_spell_use_basics': True,
+        'include_species_trait_spellcasting_hint': True,
+    },
+    'class_rules': {
+        'bard': {
+            'prepared_formula': 'none',
+            'resource_refresh': 'long_rest',
+            'show_cantrips_known': True,
+            'show_spells_known': True,
+            'include_prepared_rest_reminder': False,
+            'include_mystic_arcanum': False,
+        },
+        'cleric': {
+            'prepared_formula': 'level_plus_mod',
+            'resource_refresh': 'long_rest',
+            'show_cantrips_known': True,
+            'show_spells_known': False,
+            'include_prepared_rest_reminder': True,
+            'include_mystic_arcanum': False,
+        },
+        'druid': {
+            'prepared_formula': 'level_plus_mod',
+            'resource_refresh': 'long_rest',
+            'show_cantrips_known': True,
+            'show_spells_known': False,
+            'include_prepared_rest_reminder': True,
+            'include_mystic_arcanum': False,
+        },
+        'paladin': {
+            'prepared_formula': 'half_level_plus_mod',
+            'resource_refresh': 'long_rest',
+            'show_cantrips_known': False,
+            'show_spells_known': False,
+            'include_prepared_rest_reminder': False,
+            'include_mystic_arcanum': False,
+        },
+        'ranger': {
+            'prepared_formula': 'none',
+            'resource_refresh': 'long_rest',
+            'show_cantrips_known': False,
+            'show_spells_known': True,
+            'include_prepared_rest_reminder': False,
+            'include_mystic_arcanum': False,
+        },
+        'sorcerer': {
+            'prepared_formula': 'none',
+            'resource_refresh': 'long_rest',
+            'show_cantrips_known': True,
+            'show_spells_known': True,
+            'include_prepared_rest_reminder': False,
+            'include_mystic_arcanum': False,
+        },
+        'warlock': {
+            'prepared_formula': 'none',
+            'resource_refresh': 'warlock',
+            'show_cantrips_known': True,
+            'show_spells_known': True,
+            'include_prepared_rest_reminder': False,
+            'include_mystic_arcanum': True,
+        },
+        'wizard': {
+            'prepared_formula': 'wizard',
+            'resource_refresh': 'long_rest',
+            'show_cantrips_known': True,
+            'show_spells_known': False,
+            'include_prepared_rest_reminder': False,
+            'include_mystic_arcanum': False,
+        },
+    },
+    'class_notes': {
+        'bard': [
+            'Spellcasting: slots refresh on long rest.',
+            'Known-spell caster: choose spells learned on level-up.',
+        ],
+        'cleric': [
+            'Spellcasting: slots refresh on long rest.',
+            'Prepared caster: prepare spells each day from the cleric list.',
+        ],
+        'druid': [
+            'Spellcasting: slots refresh on long rest.',
+            'Prepared caster: prepare spells each day from the druid list.',
+        ],
+        'paladin': [
+            'Spellcasting: slots refresh on long rest.',
+            'Half-caster progression: fewer slots than full casters.',
+        ],
+        'ranger': [
+            'Spellcasting: slots refresh on long rest.',
+            'Half-caster progression: fewer slots than full casters.',
+        ],
+        'sorcerer': [
+            'Spellcasting: slots refresh on long rest.',
+            'Flexible Casting: sorcery points can create or convert spell slots.',
+        ],
+        'warlock': [
+            'Pact Magic: slots refresh on short rest.',
+            'At high levels, warlock uses 5th-level pact slots.',
+            'Mystic Arcanum handles 6th-9th level spells (1/long rest each).',
+        ],
+        'wizard': [
+            'Spellcasting: slots refresh on long rest.',
+            'Arcane Recovery restores some slots on a short rest (once/day).',
+        ],
+    },
+    'feat_note_rules': {
+        'match_mode': 'exact_normalized',
+        'use_contains_fallback': True,
+        'aliases': {
+            'Magic Initiate': [
+                'Magic Initiate (Bard)',
+                'Magic Initiate (Cleric)',
+                'Magic Initiate (Druid)',
+                'Magic Initiate (Sorcerer)',
+                'Magic Initiate (Warlock)',
+                'Magic Initiate (Wizard)',
+            ],
+            'War Caster': ['War-Caster', 'Warcaster'],
+            'Spell Sniper': ['Spell-Sniper'],
+        },
+    },
+    'feat_notes': {
+        'Elemental Adept': [
+            'Elemental Adept: choose and focus on one damage type from your feat.',
+        ],
+        'Magic Initiate': [
+            'Magic Initiate: one 1st-level spell can be cast once per long rest.',
+        ],
+        'Ritual Caster': [
+            'Ritual Caster: ritual spells can be cast without expending slots if prepared in your ritual book.',
+        ],
+        'Spell Sniper': [
+            'Spell Sniper: doubled range for attack-roll spells and more reliable cover targeting.',
+        ],
+        'War Caster': [
+            'War Caster: advantage on concentration checks and can cast in place of opportunity attacks.',
+        ],
+    },
+    'species_notes': {
+        'tiefling': [
+            'Species magic: tieflings may gain innate spells from racial traits.',
+        ],
+    },
+    'templates': {
+        'spell_use_basics_header': 'Spell Use Basics:',
+        'spellcasting_ability_line': 'Spellcasting ability: {ability_name} ({ability_mod:+d}).',
+        'spell_save_dc_line': 'Spell Save DC: {save_dc}.',
+        'spell_attack_bonus_line': 'Spell Attack Bonus: +{attack_bonus}.',
+        'cantrips_known_line': 'Cantrips known: {cantrips_known}.',
+        'spells_known_line': 'Spells known from class: {spells_known}.',
+        'prepared_spells_line_cleric_druid': (
+            'Prepared spells each day: {prepared_count} ({level} + {ability_name_short} mod).'
+        ),
+        'prepared_spells_line_wizard': (
+            'Prepared wizard spells each day: {prepared_count} ({level} + INT mod) from your spellbook.'
+        ),
+        'prepared_spells_line_paladin': (
+            'Prepared paladin spells each day: {prepared_count} (level//2 + CHA mod).'
+        ),
+        'prepared_after_long_rest_line': (
+            'After a long rest, choose prepared spells from your class list.'
+        ),
+        'warlock_slots_refresh_line': 'Pact slots refresh on a short or long rest.',
+        'mystic_arcanum_line': 'Mystic Arcanum gained: {arcanum}.',
+        'long_rest_slots_refresh_line': 'Class spell slots refresh on a long rest.',
+        'species_spellcasting_traits_line': (
+            'Species traits may grant additional spells; see your racial traits section.'
+        ),
+    },
+}
+
 SPELL_SLOT_FIELD_MAP = {
     1: 'SlotsTotal 19',
     2: 'SlotsTotal 20',
@@ -86,6 +260,11 @@ SPELL_SLOT_FIELD_MAP = {
     8: 'SlotsTotal 26',
     9: 'SlotsTotal 27',
 }
+
+ALL_ABILITIES = [
+    'strength', 'dexterity', 'constitution',
+    'intelligence', 'wisdom', 'charisma',
+]
 
 # Feature indices that grant Expertise (double proficiency on chosen skills)
 # and how many skill choices each grants.
@@ -110,6 +289,209 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONTS_DIR = os.path.join(BASE_DIR, '.fonts')
 
 
+def load_spellcasting_notes(config_path=None):
+    """Load spellcasting guidance (class/feat/species notes) from JSON config.
+
+    Backward compatible with legacy format where the JSON is a plain
+    class->notes mapping.
+    """
+    target_path = config_path or os.path.join(BASE_DIR, 'config', 'spellcasting_notes.json')
+    notes = {
+        'global_rules': dict(DEFAULT_SPELLCASTING_GUIDANCE['global_rules']),
+        'class_rules': {k: dict(v) for k, v in DEFAULT_SPELLCASTING_GUIDANCE['class_rules'].items()},
+        'class_notes': {k: list(v) for k, v in DEFAULT_SPELLCASTING_GUIDANCE['class_notes'].items()},
+        'feat_note_rules': {
+            'match_mode': DEFAULT_SPELLCASTING_GUIDANCE['feat_note_rules']['match_mode'],
+            'use_contains_fallback': DEFAULT_SPELLCASTING_GUIDANCE['feat_note_rules']['use_contains_fallback'],
+            'aliases': {
+                k: list(v)
+                for k, v in DEFAULT_SPELLCASTING_GUIDANCE['feat_note_rules']['aliases'].items()
+            },
+        },
+        'feat_notes': {k: list(v) for k, v in DEFAULT_SPELLCASTING_GUIDANCE['feat_notes'].items()},
+        'species_notes': {k: list(v) for k, v in DEFAULT_SPELLCASTING_GUIDANCE['species_notes'].items()},
+        'templates': dict(DEFAULT_SPELLCASTING_GUIDANCE['templates']),
+    }
+
+    if not os.path.exists(target_path):
+        return notes
+
+    try:
+        with open(target_path, 'r', encoding='utf-8') as handle:
+            loaded = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return notes
+
+    if not isinstance(loaded, dict):
+        return notes
+
+    # Legacy format: {"wizard": ["..."]}
+    legacy_mode = all(isinstance(value, list) for value in loaded.values())
+    if legacy_mode:
+        loaded = {'class_notes': loaded}
+
+    global_rule_data = loaded.get('global_rules', {})
+    if isinstance(global_rule_data, dict):
+        for key, value in global_rule_data.items():
+            if key in notes['global_rules'] and isinstance(value, bool):
+                notes['global_rules'][key] = value
+
+    class_rule_data = loaded.get('class_rules', {})
+    if isinstance(class_rule_data, dict):
+        for class_name, class_rules in class_rule_data.items():
+            if not isinstance(class_name, str) or not isinstance(class_rules, dict):
+                continue
+            normalized_class = class_name.strip().lower()
+            base_rules = dict(notes['class_rules'].get(
+                normalized_class,
+                DEFAULT_SPELLCASTING_GUIDANCE['class_rules'].get('wizard', {}),
+            ))
+            for key, value in class_rules.items():
+                if key in (
+                    'prepared_formula',
+                    'resource_refresh',
+                ) and isinstance(value, str):
+                    base_rules[key] = value.strip().lower()
+                elif key in (
+                    'show_cantrips_known',
+                    'show_spells_known',
+                    'include_prepared_rest_reminder',
+                    'include_mystic_arcanum',
+                ) and isinstance(value, bool):
+                    base_rules[key] = value
+            notes['class_rules'][normalized_class] = base_rules
+
+    feat_rule_data = loaded.get('feat_note_rules', {})
+    if isinstance(feat_rule_data, dict):
+        mode = feat_rule_data.get('match_mode')
+        if isinstance(mode, str) and mode.strip().lower() in ('exact_normalized', 'contains_normalized'):
+            notes['feat_note_rules']['match_mode'] = mode.strip().lower()
+
+        contains_fallback = feat_rule_data.get('use_contains_fallback')
+        if isinstance(contains_fallback, bool):
+            notes['feat_note_rules']['use_contains_fallback'] = contains_fallback
+
+        alias_data = feat_rule_data.get('aliases', {})
+        if isinstance(alias_data, dict):
+            cleaned_aliases = {}
+            for feat_name, aliases in alias_data.items():
+                if not isinstance(feat_name, str) or not isinstance(aliases, list):
+                    continue
+                cleaned = [
+                    alias.strip()
+                    for alias in aliases
+                    if isinstance(alias, str) and alias.strip()
+                ]
+                if cleaned:
+                    cleaned_aliases[feat_name.strip()] = cleaned
+            if cleaned_aliases:
+                notes['feat_note_rules']['aliases'].update(cleaned_aliases)
+
+    for section_name in ('class_notes', 'feat_notes', 'species_notes'):
+        section_data = loaded.get(section_name, {})
+        if not isinstance(section_data, dict):
+            continue
+        for key, value in section_data.items():
+            if not isinstance(key, str) or not isinstance(value, list):
+                continue
+            cleaned_lines = [
+                line.strip()
+                for line in value
+                if isinstance(line, str) and line.strip()
+            ]
+            if cleaned_lines:
+                normalized_key = key.strip()
+                if section_name in ('class_notes', 'species_notes'):
+                    normalized_key = normalized_key.lower()
+                notes[section_name][normalized_key] = cleaned_lines
+
+    template_data = loaded.get('templates', {})
+    if isinstance(template_data, dict):
+        for key, value in template_data.items():
+            if isinstance(key, str) and isinstance(value, str) and value.strip():
+                notes['templates'][key.strip()] = value.strip()
+
+    return notes
+
+
+def load_asi_weight_config(config_path=None):
+    """Load class/species ASI weighting rules from JSON config."""
+    default_config = {
+        'global': {
+            'class_primary_weight': 220,
+            'class_secondary_weight': 95,
+            'spellcasting_weight': 115,
+            'species_weight_scale': 20,
+            'under_cap_weight': 1,
+            'odd_score_weight': 14,
+            'sub_ten_weight': 90,
+            'important_below_floor_weight': 130,
+            'important_floor_target': 14,
+            'important_floor_trigger': 10,
+            'force_asi_when_important_below_floor': True,
+        },
+        'class_priorities': {},
+        'species_modifiers': {},
+    }
+
+    target_path = config_path or os.path.join(BASE_DIR, 'config', 'ability_score_weights.json')
+    if not os.path.exists(target_path):
+        return default_config
+
+    try:
+        with open(target_path, 'r', encoding='utf-8') as handle:
+            loaded = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return default_config
+
+    if not isinstance(loaded, dict):
+        return default_config
+
+    config = {
+        'global': dict(default_config['global']),
+        'class_priorities': dict(default_config['class_priorities']),
+        'species_modifiers': dict(default_config['species_modifiers']),
+    }
+
+    global_cfg = loaded.get('global', {})
+    if isinstance(global_cfg, dict):
+        for key, value in global_cfg.items():
+            if key in config['global'] and isinstance(value, (int, float, bool)):
+                config['global'][key] = value
+
+    class_cfg = loaded.get('class_priorities', {})
+    if isinstance(class_cfg, dict):
+        for class_name, priority_data in class_cfg.items():
+            if not isinstance(class_name, str) or not isinstance(priority_data, dict):
+                continue
+            normalized = class_name.strip().lower()
+            config['class_priorities'][normalized] = {
+                'primary': [a for a in priority_data.get('primary', []) if a in ALL_ABILITIES],
+                'secondary': [a for a in priority_data.get('secondary', []) if a in ALL_ABILITIES],
+            }
+
+    species_cfg = loaded.get('species_modifiers', {})
+    if isinstance(species_cfg, dict):
+        for species_name, weights in species_cfg.items():
+            if not isinstance(species_name, str) or not isinstance(weights, dict):
+                continue
+            normalized_species = species_name.strip().lower()
+            cleaned = {}
+            for ability, weight in weights.items():
+                if ability in ALL_ABILITIES and isinstance(weight, (int, float)):
+                    cleaned[ability] = float(weight)
+            if cleaned:
+                config['species_modifiers'][normalized_species] = cleaned
+
+    return config
+
+
+SPELLCASTING_GUIDANCE = load_spellcasting_notes()
+SPELLCASTING_NOTES = SPELLCASTING_GUIDANCE['class_notes']
+ASI_WEIGHT_CONFIG = load_asi_weight_config()
+FEAT_CONFIG = load_feat_config()
+
+
 
 class Character:
     def __init__(self, name, species, char_class, sex, level):
@@ -132,7 +514,13 @@ class Character:
         self.jack_of_all_trades = False  # bard: half prof on non-proficient skills
         self.extra_languages = []        # from racial language choices
         self.asi_log = []                # track each ASI taken {ability: bonus}
+        self.advancement_log = []        # ordered ASI-vs-feat selections
         self.feats = []                  # optional selected feats (dict/object/string)
+        self.speed_bonus = 0
+        self.initiative_bonus = 0
+        self.passive_perception_bonus = 0
+        self.hp_bonus_per_level = 0
+        self.aggressive_asi_focus = set()
         self.proficiencies = []
         self.equipment = []
         self.saving_throw_proficiencies = [
@@ -170,26 +558,30 @@ class Character:
         return features
 
     def get_features_annotated(self):
-        """Return features list with ASI entries annotated with which abilities improved."""
+        """Return features with ASI entries replaced by ASI or feat choices."""
         features = []
-        asi_index = 0
+        advancement_index = 0
         for lvl in range(1, self.level + 1):
             level_data = getattr(Levels, f"{self.char_class}_{lvl}")
             for feat in level_data.features:
                 name = feat['name']
-                if name == 'Ability Score Improvement' and asi_index < len(self.asi_log):
-                    record = self.asi_log[asi_index]
-                    parts = [f"+{v} {k[:3].upper()}" for k, v in record.items() if v > 0]
-                    if parts:
-                        name = f"Ability Score Improvement ({', '.join(parts)})"
-                    asi_index += 1
+                if name == 'Ability Score Improvement' and advancement_index < len(self.advancement_log):
+                    record = self.advancement_log[advancement_index]
+                    if record.get('type') == 'feat':
+                        name = record['feat'].get('summary', record['feat'].get('name', name))
+                    else:
+                        bonuses = record.get('ability_bonuses', {})
+                        parts = [f"+{v} {k[:3].upper()}" for k, v in bonuses.items() if v > 0]
+                        if parts:
+                            name = f"Ability Score Improvement ({', '.join(parts)})"
+                    advancement_index += 1
                 features.append(name)
         return features
 
     def get_speed(self):
         species_key = self.species.lower()
         race_data = getattr(Species, species_key)
-        return race_data.speed
+        return race_data.speed + self.speed_bonus
 
     def get_languages(self):
         species_key = self.species.lower()
@@ -199,7 +591,190 @@ class Character:
         # Rogues learn Thieves' Cant as a secret language at level 1
         if "Thieves' Cant" in self.get_features() and "Thieves' Cant" not in languages:
             languages.append("Thieves' Cant")
-        return languages
+        return list(dict.fromkeys(languages))
+
+    def selected_feat_names(self):
+        return [feat.get('name', str(feat)) for feat in self.feats if isinstance(feat, dict)]
+
+    def passive_perception(self):
+        return 10 + self.skill_modifier('Perception') + self.passive_perception_bonus
+
+    def _spellcaster_notes(self, prof_bonus):
+        if self.char_class not in SPELLCASTING_ABILITY:
+            return []
+
+        notes = []
+
+        def append_unique(line):
+            if line and line not in notes:
+                notes.append(line)
+
+        templates = SPELLCASTING_GUIDANCE.get('templates', {})
+        global_rules = SPELLCASTING_GUIDANCE.get('global_rules', {})
+        class_rules = SPELLCASTING_GUIDANCE.get('class_rules', {}).get(self.char_class, {})
+        feat_note_rules = SPELLCASTING_GUIDANCE.get('feat_note_rules', {})
+
+        def render(template_key, default, **values):
+            template = templates.get(template_key, default)
+            try:
+                return template.format(**values)
+            except (KeyError, ValueError):
+                return default.format(**values)
+
+        def normalize_feat_name(value):
+            return ''.join(ch.lower() for ch in str(value) if ch.isalnum())
+
+        def feat_note_applies(note_key, selected_names):
+            normalized_selected = [normalize_feat_name(name) for name in selected_names]
+            normalized_note = normalize_feat_name(note_key)
+
+            aliases = feat_note_rules.get('aliases', {}).get(note_key, [])
+            normalized_aliases = [normalize_feat_name(alias) for alias in aliases]
+            candidates = [normalized_note] + [alias for alias in normalized_aliases if alias]
+
+            match_mode = str(feat_note_rules.get('match_mode', 'exact_normalized')).lower()
+            use_contains_fallback = bool(feat_note_rules.get('use_contains_fallback', True))
+
+            def exact_match():
+                return any(candidate and candidate in normalized_selected for candidate in candidates)
+
+            def contains_match():
+                for selected in normalized_selected:
+                    if not selected:
+                        continue
+                    for candidate in candidates:
+                        if candidate and (candidate in selected or selected in candidate):
+                            return True
+                return False
+
+            if match_mode == 'contains_normalized':
+                return contains_match()
+            if exact_match():
+                return True
+            if use_contains_fallback:
+                return contains_match()
+            return False
+
+        ability = SPELLCASTING_ABILITY[self.char_class]
+        ability_mod = modifier(getattr(self, ability))
+        save_dc = 8 + prof_bonus + ability_mod
+        attack_bonus = prof_bonus + ability_mod
+
+        include_basics = bool(global_rules.get('include_spell_use_basics', True))
+        if include_basics:
+            append_unique(render(
+                'spell_use_basics_header',
+                'Spell Use Basics:'
+            ))
+            append_unique(render(
+                'spellcasting_ability_line',
+                'Spellcasting ability: {ability_name} ({ability_mod:+d}).',
+                ability_name=ability.capitalize(),
+                ability_mod=ability_mod,
+            ))
+            append_unique(render(
+                'spell_save_dc_line',
+                'Spell Save DC: {save_dc}.',
+                save_dc=save_dc,
+            ))
+            append_unique(render(
+                'spell_attack_bonus_line',
+                'Spell Attack Bonus: +{attack_bonus}.',
+                attack_bonus=attack_bonus,
+            ))
+
+        level_data = getattr(Levels, f"{self.char_class}_{self.level}")
+        spellcasting = getattr(level_data, 'spellcasting', None) or {}
+        cantrips_known = int(spellcasting.get('cantrips_known', 0) or 0)
+        spells_known = int(spellcasting.get('spells_known', 0) or 0)
+        if class_rules.get('show_cantrips_known', True) and cantrips_known > 0:
+            append_unique(render(
+                'cantrips_known_line',
+                'Cantrips known: {cantrips_known}.',
+                cantrips_known=cantrips_known,
+            ))
+        if class_rules.get('show_spells_known', True) and spells_known > 0:
+            append_unique(render(
+                'spells_known_line',
+                'Spells known from class: {spells_known}.',
+                spells_known=spells_known,
+            ))
+
+        prepared_formula = class_rules.get('prepared_formula', 'none')
+        if prepared_formula == 'level_plus_mod':
+            prepare_count = max(1, self.level + ability_mod)
+            append_unique(render(
+                'prepared_spells_line_cleric_druid',
+                'Prepared spells each day: {prepared_count} ({level} + {ability_name_short} mod).',
+                prepared_count=prepare_count,
+                level=self.level,
+                ability_name_short=ability.capitalize(),
+            ))
+            if class_rules.get('include_prepared_rest_reminder', False):
+                append_unique(render(
+                    'prepared_after_long_rest_line',
+                    'After a long rest, choose prepared spells from your class list.'
+                ))
+        elif prepared_formula == 'wizard':
+            prepare_count = max(1, self.level + ability_mod)
+            append_unique(render(
+                'prepared_spells_line_wizard',
+                'Prepared wizard spells each day: {prepared_count} ({level} + INT mod) from your spellbook.',
+                prepared_count=prepare_count,
+                level=self.level,
+            ))
+        elif prepared_formula == 'half_level_plus_mod':
+            prepare_count = max(1, (self.level // 2) + ability_mod)
+            append_unique(render(
+                'prepared_spells_line_paladin',
+                'Prepared paladin spells each day: {prepared_count} (level//2 + CHA mod).',
+                prepared_count=prepare_count,
+            ))
+
+        resource_refresh = class_rules.get('resource_refresh', 'long_rest')
+        if resource_refresh == 'warlock':
+            append_unique(render(
+                'warlock_slots_refresh_line',
+                'Pact slots refresh on a short or long rest.'
+            ))
+        else:
+            append_unique(render(
+                'long_rest_slots_refresh_line',
+                'Class spell slots refresh on a long rest.'
+            ))
+
+        if class_rules.get('include_mystic_arcanum', False):
+            arcanum = [
+                feature['name'] for feature in level_data.features
+                if 'Mystic Arcanum' in feature.get('name', '')
+            ]
+            if arcanum:
+                append_unique(render(
+                    'mystic_arcanum_line',
+                    'Mystic Arcanum gained: {arcanum}.',
+                    arcanum=', '.join(arcanum),
+                ))
+
+        for line in SPELLCASTING_GUIDANCE.get('class_notes', {}).get(self.char_class, []):
+            append_unique(line)
+
+        for line in SPELLCASTING_GUIDANCE.get('species_notes', {}).get(self.species.lower(), []):
+            append_unique(line)
+
+        selected_feats = self.selected_feat_names()
+        for feat_name, feat_lines in SPELLCASTING_GUIDANCE.get('feat_notes', {}).items():
+            if feat_note_applies(feat_name, selected_feats):
+                for line in feat_lines:
+                    append_unique(line)
+
+        include_species_hint = bool(global_rules.get('include_species_trait_spellcasting_hint', True))
+        if include_species_hint and any('Spellcasting' in trait for trait in self.get_traits()):
+            append_unique(render(
+                'species_spellcasting_traits_line',
+                'Species traits may grant additional spells; see your racial traits section.'
+            ))
+
+        return notes
 
     def get_traits(self):
         species_key = self.species.lower()
@@ -246,6 +821,19 @@ class Character:
                     asi_levels.append(lvl)
 
         for asi_level in asi_levels:
+            aggressive_focus = self._refresh_aggressive_asi_focus()
+            force_asi = bool(
+                ASI_WEIGHT_CONFIG['global'].get('force_asi_when_important_below_floor', True)
+                and aggressive_focus
+            )
+
+            if not force_asi:
+                selected_feat = choose_feat_for_character(self, asi_level, FEAT_CONFIG)
+                if selected_feat is not None:
+                    self._apply_selected_feat(selected_feat)
+                    self.advancement_log.append({'type': 'feat', 'feat': selected_feat})
+                    continue
+
             prefer_sc = (spellcast_ability
                          if (spellcast_ability and asi_level <= 15)
                          else None)
@@ -253,6 +841,7 @@ class Character:
             first, second = self._rank_asi_candidates(
                 prefer_spellcast_ability=prefer_sc,
                 prioritize_sub_ten=prioritize_sub_ten,
+                aggressive_focus=aggressive_focus,
             )
 
             asi_record = {}
@@ -262,8 +851,9 @@ class Character:
                     setattr(self, ability, s + 1)
                     asi_record[ability] = asi_record.get(ability, 0) + 1
             self.asi_log.append(asi_record)
+            self.advancement_log.append({'type': 'asi', 'ability_bonuses': asi_record})
 
-    def _rank_asi_candidates(self, prefer_spellcast_ability, prioritize_sub_ten=False):
+    def _rank_asi_candidates(self, prefer_spellcast_ability, prioritize_sub_ten=False, aggressive_focus=None):
         """Return (first, second) ability names for one ASI (+2 points total).
 
         first  — highest-priority target for the first +1 point
@@ -276,46 +866,124 @@ class Character:
           3) odd abilities (odd+1 = even -> +1 modifier step)
           4) any ability below cap
         """
-        all_abilities = ['strength', 'dexterity', 'constitution',
-                         'intelligence', 'wisdom', 'charisma']
-        under_cap = [a for a in all_abilities if getattr(self, a) < 20]
+        under_cap = [a for a in ALL_ABILITIES if getattr(self, a) < 20]
         if not under_cap:
             return None, None
 
-        below_ten_under_cap = [a for a in under_cap if getattr(self, a) < 10]
-        odd_under_cap = [a for a in under_cap if getattr(self, a) % 2 == 1]
+        first = self._best_asi_ability(
+            candidates=under_cap,
+            prefer_spellcast_ability=prefer_spellcast_ability,
+            prioritize_sub_ten=prioritize_sub_ten,
+            aggressive_focus=aggressive_focus,
+        )
 
-        # First point
-        if prioritize_sub_ten and below_ten_under_cap:
-            if prefer_spellcast_ability in below_ten_under_cap:
-                first = prefer_spellcast_ability
-            else:
-                first = random.choice(below_ten_under_cap)
-        elif prefer_spellcast_ability and prefer_spellcast_ability in under_cap:
-            first = prefer_spellcast_ability
-        elif odd_under_cap:
-            first = random.choice(odd_under_cap)
-        else:
-            first = random.choice(under_cap)
+        if first is None:
+            return None, None
 
-        other_under = [a for a in under_cap if a != first]
-        below_ten_other_under = [a for a in other_under if getattr(self, a) < 10]
-        odd_for_second = [a for a in odd_under_cap if a != first]
+        setattr(self, first, getattr(self, first) + 1)
+        try:
+            still_under_cap = [a for a in ALL_ABILITIES if getattr(self, a) < 20]
+            second_pool = still_under_cap or [first]
+            second = self._best_asi_ability(
+                candidates=second_pool,
+                prefer_spellcast_ability=prefer_spellcast_ability,
+                prioritize_sub_ten=prioritize_sub_ten,
+                aggressive_focus=aggressive_focus,
+            )
+        finally:
+            setattr(self, first, getattr(self, first) - 1)
 
-        # Second point
-        if prioritize_sub_ten and below_ten_other_under:
-            second = random.choice(below_ten_other_under)
-        elif odd_for_second:
-            second = random.choice(odd_for_second)
-        elif other_under:
-            second = random.choice(other_under)
-        else:
+        if second is None:
             second = first
 
         return first, second
 
+    def _important_abilities(self, prefer_spellcast_ability=None, primary_only=False):
+        class_cfg = ASI_WEIGHT_CONFIG.get('class_priorities', {}).get(self.char_class, {})
+        primary = class_cfg.get('primary', [])
+        secondary = [] if primary_only else class_cfg.get('secondary', [])
+
+        ordered = []
+        for ability in primary + secondary:
+            if ability in ALL_ABILITIES and ability not in ordered:
+                ordered.append(ability)
+        if prefer_spellcast_ability and prefer_spellcast_ability in ALL_ABILITIES and prefer_spellcast_ability not in ordered:
+            ordered.append(prefer_spellcast_ability)
+        return ordered
+
+    def _refresh_aggressive_asi_focus(self):
+        cfg = ASI_WEIGHT_CONFIG.get('global', {})
+        trigger = int(cfg.get('important_floor_trigger', 10))
+        floor = int(cfg.get('important_floor_target', 14))
+        important = self._important_abilities(
+            SPELLCASTING_ABILITY.get(self.char_class),
+            primary_only=True,
+        )
+
+        if not self.aggressive_asi_focus:
+            for ability in important:
+                if getattr(self, ability) < trigger:
+                    self.aggressive_asi_focus.add(ability)
+
+        self.aggressive_asi_focus = {
+            ability for ability in self.aggressive_asi_focus
+            if getattr(self, ability) < floor and getattr(self, ability) < 20
+        }
+        return set(self.aggressive_asi_focus)
+
+    def _ability_investment_score(self, ability, prefer_spellcast_ability, prioritize_sub_ten, aggressive_focus):
+        cfg = ASI_WEIGHT_CONFIG.get('global', {})
+        class_cfg = ASI_WEIGHT_CONFIG.get('class_priorities', {}).get(self.char_class, {})
+        species_cfg = ASI_WEIGHT_CONFIG.get('species_modifiers', {}).get(self.species.lower(), {})
+
+        current = getattr(self, ability)
+        score = 0.0
+
+        if ability in class_cfg.get('primary', []):
+            score += float(cfg.get('class_primary_weight', 0))
+        if ability in class_cfg.get('secondary', []):
+            score += float(cfg.get('class_secondary_weight', 0))
+        if prefer_spellcast_ability and ability == prefer_spellcast_ability:
+            score += float(cfg.get('spellcasting_weight', 0))
+
+        score += float(species_cfg.get(ability, 0)) * float(cfg.get('species_weight_scale', 0))
+        score += max(0, 20 - current) * float(cfg.get('under_cap_weight', 0))
+
+        if current % 2 == 1:
+            score += float(cfg.get('odd_score_weight', 0))
+        if prioritize_sub_ten and current < 10:
+            score += float(cfg.get('sub_ten_weight', 0))
+
+        floor = int(cfg.get('important_floor_target', 14))
+        if ability in aggressive_focus and current < floor:
+            score += float(cfg.get('important_below_floor_weight', 0)) * (floor - current)
+
+        return score
+
+    def _best_asi_ability(self, candidates, prefer_spellcast_ability, prioritize_sub_ten, aggressive_focus):
+        if not candidates:
+            return None
+
+        aggressive_focus = aggressive_focus or set()
+
+        best = None
+        best_score = None
+        for ability in ALL_ABILITIES:
+            if ability not in candidates:
+                continue
+            score = self._ability_investment_score(
+                ability=ability,
+                prefer_spellcast_ability=prefer_spellcast_ability,
+                prioritize_sub_ten=prioritize_sub_ten,
+                aggressive_focus=aggressive_focus,
+            )
+            if best is None or score > best_score:
+                best = ability
+                best_score = score
+        return best
+
     def apply_feat_ability_bonuses(self):
-        """Apply ability bonuses granted by selected feats.
+        """Apply any feat effects that were injected but not yet applied.
 
         This method is intentionally permissive because feat payloads can come
         from different sources. Supported feat shapes include:
@@ -326,8 +994,19 @@ class Character:
         numeric `bonus`. Unknown shapes are ignored safely.
         """
         for feat in self.feats:
+            if isinstance(feat, dict) and feat.get('_applied'):
+                continue
             bonuses = []
             if isinstance(feat, dict):
+                if (
+                    feat.get('selected_ability_bonuses')
+                    or feat.get('selected_languages')
+                    or feat.get('selected_proficiencies')
+                    or feat.get('selected_saving_throw')
+                ):
+                    self._apply_feat_effects(feat)
+                    feat['_applied'] = True
+                    continue
                 bonuses = feat.get('ability_bonuses', []) or []
             elif hasattr(feat, 'ability_bonuses'):
                 bonuses = getattr(feat, 'ability_bonuses') or []
@@ -339,6 +1018,42 @@ class Character:
                 if ability_key and isinstance(bonus_value, int) and bonus_value > 0:
                     current = getattr(self, ability_key)
                     setattr(self, ability_key, min(20, current + bonus_value))
+
+    def _apply_selected_feat(self, feat):
+        self._apply_feat_effects(feat)
+        feat['_applied'] = True
+        self.feats.append(feat)
+
+    def _apply_feat_effects(self, feat):
+        for ability_name, bonus in feat.get('selected_ability_bonuses', {}).items():
+            current = getattr(self, ability_name)
+            setattr(self, ability_name, min(20, current + int(bonus)))
+
+        for language_name in feat.get('selected_languages', []):
+            if language_name not in self.extra_languages:
+                self.extra_languages.append(language_name)
+
+        for proficiency_name in feat.get('selected_proficiencies', []):
+            if proficiency_name in SKILLS and proficiency_name not in self.skill_proficiencies:
+                self.skill_proficiencies.append(proficiency_name)
+            elif proficiency_name.startswith('Skill: '):
+                skill_name = proficiency_name.replace('Skill: ', '')
+                if skill_name not in self.skill_proficiencies:
+                    self.skill_proficiencies.append(skill_name)
+            elif proficiency_name not in self.proficiencies:
+                self.proficiencies.append(proficiency_name)
+
+        selected_save = feat.get('selected_saving_throw')
+        if selected_save:
+            save_name = selected_save[:3].upper()
+            if save_name not in self.saving_throw_proficiencies:
+                self.saving_throw_proficiencies.append(save_name)
+
+        grants = feat.get('grants', {})
+        self.speed_bonus += int(grants.get('speed_bonus', 0))
+        self.initiative_bonus += int(grants.get('initiative_bonus', 0))
+        self.passive_perception_bonus += int(grants.get('passive_perception_bonus', 0))
+        self.hp_bonus_per_level += int(grants.get('hp_per_level_bonus', 0))
 
     def _normalize_ability_key(self, ability_ref):
         """Normalize SRD-like ability references to internal attribute names."""
@@ -476,9 +1191,9 @@ class Character:
         self.choose_expertise()             # Expertise from class features
         self.apply_jack_of_all_trades()     # JOAT half-prof flag
         self.apply_asi()
-        self.apply_feat_ability_bonuses()   # optional feat-granted ability boosts
+        self.apply_feat_ability_bonuses()   # apply any externally injected pending feats
         self.hp = hp(level=self.level, constitution=self.constitution,
-                     hit_die=self.hit_die)
+                 hit_die=self.hit_die) + (self.hp_bonus_per_level * self.level)
 
     def level_up(self):
         self.level += 1
@@ -515,7 +1230,7 @@ class Character:
         Proficiency Bonus: +{self.proficiency_bonus()}
         Skill Proficiencies: {', '.join(self.skill_proficiencies)}
         Languages: {', '.join(self.get_languages())}
-        Features: {', '.join(self.get_features())}
+        Features: {', '.join(self.get_features_annotated())}
         """
         print(character_sheet)
 
@@ -552,9 +1267,9 @@ class Character:
             "HD": self.hit_die,
             "HDTotal": str(self.hit_die_total()),
             "AC": 10 + modifier(self.dexterity),
-            "Initiative": modifier(self.dexterity),
+            "Initiative": modifier(self.dexterity) + self.initiative_bonus,
             "Speed": self.get_speed(),
-            "Passive": 10 + self.skill_modifier('Perception'),
+            "Passive": self.passive_perception(),
         }
 
         # Saving throws - checkboxes and values
@@ -606,7 +1321,11 @@ class Character:
         # Features and Traits (ASI entries include parenthetical ability notes)
         features = self.get_features_annotated()
         fields['Features and Traits'] = '\n'.join(features)
-        fields['Feat+Traits'] = '\n'.join(traits)
+        trait_lines = list(traits)
+        spellcaster_notes = self._spellcaster_notes(prof_bonus)
+        if spellcaster_notes:
+            trait_lines.extend([''] + spellcaster_notes)
+        fields['Feat+Traits'] = '\n'.join(trait_lines)
 
         # Weapon attacks (populate first weapon slot from equipment if applicable)
         weapon_equipped = False
