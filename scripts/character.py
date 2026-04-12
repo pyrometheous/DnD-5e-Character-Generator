@@ -132,6 +132,7 @@ class Character:
         self.jack_of_all_trades = False  # bard: half prof on non-proficient skills
         self.extra_languages = []        # from racial language choices
         self.asi_log = []                # track each ASI taken {ability: bonus}
+        self.feats = []                  # optional selected feats (dict/object/string)
         self.proficiencies = []
         self.equipment = []
         self.saving_throw_proficiencies = [
@@ -218,6 +219,10 @@ class Character:
 
         Each ASI distributes +2 points using the following priority:
 
+                For any character at ASI levels < 10
+                    1. Any ability below 10 (reduce/remove negative modifiers early)
+                    2. Then continue with the class-based rules below
+
         For spellcasters at ASI levels ≤ 15
           1. Spellcasting ability (regardless of current parity)
           2. Any other ability currently at an odd score  (odd → even = +1 modifier)
@@ -244,7 +249,11 @@ class Character:
             prefer_sc = (spellcast_ability
                          if (spellcast_ability and asi_level <= 15)
                          else None)
-            first, second = self._rank_asi_candidates(prefer_sc)
+            prioritize_sub_ten = asi_level < 10
+            first, second = self._rank_asi_candidates(
+                prefer_spellcast_ability=prefer_sc,
+                prioritize_sub_ten=prioritize_sub_ten,
+            )
 
             asi_record = {}
             for ability in (a for a in (first, second) if a is not None):
@@ -254,16 +263,18 @@ class Character:
                     asi_record[ability] = asi_record.get(ability, 0) + 1
             self.asi_log.append(asi_record)
 
-    def _rank_asi_candidates(self, prefer_spellcast_ability):
+    def _rank_asi_candidates(self, prefer_spellcast_ability, prioritize_sub_ten=False):
         """Return (first, second) ability names for one ASI (+2 points total).
 
         first  — highest-priority target for the first +1 point
         second — highest-priority target for the second +1 point (may equal
                  first only when every other ability is already at 20)
 
-        Odd-scored abilities are preferred because each +1 raises the modifier
-        (odd+1 = even causes modifier floor to increase).  The spellcasting
-        ability is promoted to the front of that queue when preferred.
+        Priority order for each point:
+          1) abilities below 10 (when prioritize_sub_ten=True)
+          2) spellcasting ability (when preferred)
+          3) odd abilities (odd+1 = even -> +1 modifier step)
+          4) any ability below cap
         """
         all_abilities = ['strength', 'dexterity', 'constitution',
                          'intelligence', 'wisdom', 'charisma']
@@ -271,25 +282,85 @@ class Character:
         if not under_cap:
             return None, None
 
+        below_ten_under_cap = [a for a in under_cap if getattr(self, a) < 10]
         odd_under_cap = [a for a in under_cap if getattr(self, a) % 2 == 1]
 
         # First point
-        if prefer_spellcast_ability and prefer_spellcast_ability in under_cap:
+        if prioritize_sub_ten and below_ten_under_cap:
+            if prefer_spellcast_ability in below_ten_under_cap:
+                first = prefer_spellcast_ability
+            else:
+                first = random.choice(below_ten_under_cap)
+        elif prefer_spellcast_ability and prefer_spellcast_ability in under_cap:
             first = prefer_spellcast_ability
         elif odd_under_cap:
             first = random.choice(odd_under_cap)
         else:
             first = random.choice(under_cap)
 
-        # Second point: prefer a *different* odd ability if one exists
+        other_under = [a for a in under_cap if a != first]
+        below_ten_other_under = [a for a in other_under if getattr(self, a) < 10]
         odd_for_second = [a for a in odd_under_cap if a != first]
-        if odd_for_second:
+
+        # Second point
+        if prioritize_sub_ten and below_ten_other_under:
+            second = random.choice(below_ten_other_under)
+        elif odd_for_second:
             second = random.choice(odd_for_second)
+        elif other_under:
+            second = random.choice(other_under)
         else:
-            other_under = [a for a in under_cap if a != first]
-            second = random.choice(other_under) if other_under else first
+            second = first
 
         return first, second
+
+    def apply_feat_ability_bonuses(self):
+        """Apply ability bonuses granted by selected feats.
+
+        This method is intentionally permissive because feat payloads can come
+        from different sources. Supported feat shapes include:
+          - dict with key `ability_bonuses`
+          - object with attribute `ability_bonuses`
+
+        Each bonus entry should provide ability metadata with index/name and a
+        numeric `bonus`. Unknown shapes are ignored safely.
+        """
+        for feat in self.feats:
+            bonuses = []
+            if isinstance(feat, dict):
+                bonuses = feat.get('ability_bonuses', []) or []
+            elif hasattr(feat, 'ability_bonuses'):
+                bonuses = getattr(feat, 'ability_bonuses') or []
+
+            for bonus in bonuses:
+                ability_ref = bonus.get('ability_score', {}) if isinstance(bonus, dict) else {}
+                ability_key = self._normalize_ability_key(ability_ref)
+                bonus_value = bonus.get('bonus', 0) if isinstance(bonus, dict) else 0
+                if ability_key and isinstance(bonus_value, int) and bonus_value > 0:
+                    current = getattr(self, ability_key)
+                    setattr(self, ability_key, min(20, current + bonus_value))
+
+    def _normalize_ability_key(self, ability_ref):
+        """Normalize SRD-like ability references to internal attribute names."""
+        if isinstance(ability_ref, dict):
+            index = str(ability_ref.get('index', '')).lower()
+            name = str(ability_ref.get('name', '')).lower()
+            if index in ABILITY_INDEX_MAP:
+                return ABILITY_INDEX_MAP[index]
+            if index in ABILITY_INDEX_MAP.values():
+                return index
+            if name in ABILITY_INDEX_MAP:
+                return ABILITY_INDEX_MAP[name]
+            if name in ABILITY_INDEX_MAP.values():
+                return name
+            return None
+        if isinstance(ability_ref, str):
+            key = ability_ref.lower().strip()
+            if key in ABILITY_INDEX_MAP:
+                return ABILITY_INDEX_MAP[key]
+            if key in ABILITY_INDEX_MAP.values():
+                return key
+        return None
 
     def choose_skill_proficiencies(self):
         cls = getattr(Classes, self.char_class)
@@ -405,6 +476,7 @@ class Character:
         self.choose_expertise()             # Expertise from class features
         self.apply_jack_of_all_trades()     # JOAT half-prof flag
         self.apply_asi()
+        self.apply_feat_ability_bonuses()   # optional feat-granted ability boosts
         self.hp = hp(level=self.level, constitution=self.constitution,
                      hit_die=self.hit_die)
 
@@ -558,18 +630,23 @@ class Character:
             except AttributeError:
                 pass
 
-        # Spell slots for casters
-        if self.char_class in SPELLCASTING_ABILITY:
-            level_data = getattr(Levels, f"{self.char_class}_{self.level}")
-            if hasattr(level_data, 'spellcasting') and level_data.spellcasting:
-                sc = level_data.spellcasting
+        # Spell sheet fields.
+        # Populate slot totals from level spellcasting data whenever present,
+        # even if the class is not in our spellcasting-ability map.
+        level_data = getattr(Levels, f"{self.char_class}_{self.level}")
+        sc = getattr(level_data, 'spellcasting', None)
+        if sc:
+            fields.update(build_spell_slot_fields(sc, spellbook=spellbook))
+
+            # Only set ability/DC/attack bonus when we know the class's
+            # spellcasting ability mapping.
+            if self.char_class in SPELLCASTING_ABILITY:
                 spell_ability = SPELLCASTING_ABILITY[self.char_class]
                 spell_mod = modifier(getattr(self, spell_ability))
                 fields['SpellcastingAbility 2'] = spell_ability.capitalize()[:3].upper()
                 fields['SpellSaveDC  2'] = 8 + prof_bonus + spell_mod
                 fields['SpellAtkBonus 2'] = f"+{prof_bonus + spell_mod}"
                 fields['Spellcasting Class 2'] = self.char_class.capitalize()
-                fields.update(build_spell_slot_fields(sc, spellbook=spellbook))
 
         apply_spellbook_fields(fields, spellbook)
 
