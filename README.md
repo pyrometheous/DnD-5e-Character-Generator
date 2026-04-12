@@ -9,6 +9,10 @@ A toolkit for generating random, rules-legal D&D 5th Edition characters (levels 
 - [CLI usage guide](docs/CLI_USAGE.md)
 - [GUI assets and credits](docs/GUI_ASSETS.md)
 
+## Disclaimer
+I got a little excited and felt like this was finished earlier, but as of right now, I'm re-working a lot of stuff and I wouldn't say this is in a finished state. Your milage may vary. Major refactor is incoming.
+
+
 ## Setup
 
 ### Requirements
