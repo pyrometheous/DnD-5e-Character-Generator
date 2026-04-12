@@ -534,6 +534,8 @@ class Character:
         self.feature_annotations = {}
         self.bonus_features_by_level = {}
         self.class_feature_choices = []
+        self.class_specific_by_level = {}
+        self.class_specific_current = {}
         self.progression_built_to_level = 0
         self.applied_subclass_feature_levels = set()
         self.spellcasting_profile = None
@@ -599,12 +601,58 @@ class Character:
             features.extend(self.bonus_features_by_level.get(lvl, []))
         return features
 
+    def _collect_feature_entries(self, annotated=False):
+        """Return ordered (level, label) entries for class/subclass features."""
+        entries = []
+        advancement_index = 0
+        for lvl in range(1, self.level + 1):
+            level_data = getattr(Levels, f"{self.char_class}_{lvl}")
+            for feature in level_data.features:
+                entries.append((
+                    lvl,
+                    self._feature_label(
+                        lvl,
+                        feature,
+                        annotated=annotated,
+                        advancement_index=advancement_index,
+                    ),
+                ))
+                if feature['name'] == 'Ability Score Improvement':
+                    advancement_index += 1
+            for bonus_feature in self.bonus_features_by_level.get(lvl, []):
+                entries.append((lvl, bonus_feature))
+        return entries
+
+    def _condense_feature_entries(self, entries):
+        """Collapse repeated features into one line with counts and levels."""
+        order = []
+        levels_by_label = {}
+        for level, label in entries:
+            if label not in levels_by_label:
+                levels_by_label[label] = []
+                order.append(label)
+            levels_by_label[label].append(level)
+
+        condensed = []
+        for label in order:
+            levels = levels_by_label[label]
+            if len(levels) <= 1:
+                condensed.append(label)
+                continue
+            level_text = ', '.join(f"lv {lvl}" for lvl in levels)
+            condensed.append(f"{label} ({len(levels)}x: {level_text})")
+        return condensed
+
     def get_features(self):
         return self._collect_feature_names(annotated=False)
 
     def get_features_annotated(self):
         """Return features with progression choices and ASI entries annotated."""
         return self._collect_feature_names(annotated=True)
+
+    def get_features_annotated_condensed(self):
+        """Return annotated features with repeated items collapsed by level."""
+        return self._condense_feature_entries(self._collect_feature_entries(annotated=True))
 
     def armor_class(self):
         return 10 + modifier(self.dexterity) + self.armor_class_bonus
@@ -847,6 +895,20 @@ class Character:
             notes.append(f"{feature_name}: {', '.join(choice_names)}.")
 
         return notes
+
+    def _split_feature_trait_lines(self, lines, first_page_max_lines=30):
+        """Split one feature/trait stream into page 1 then page 2 continuation."""
+        if len(lines) <= first_page_max_lines:
+            return lines, []
+
+        page_one = list(lines[:first_page_max_lines])
+        page_two = list(lines[first_page_max_lines:])
+
+        # Avoid awkward duplicate blank boundary when splitting.
+        while page_one and page_two and page_one[-1] == '' and page_two[0] == '':
+            page_two.pop(0)
+
+        return page_one, page_two
 
     def get_traits(self):
         species_key = self.species.lower()
@@ -1368,16 +1430,22 @@ class Character:
         fields['ProficienciesLang'] = '\n'.join(prof_lines)
 
         # Features and Traits (ASI entries include parenthetical ability notes)
-        features = self.get_features_annotated()
-        fields['Features and Traits'] = '\n'.join(features)
-        trait_lines = list(traits)
+        features = self.get_features_annotated_condensed()
+        all_feature_trait_lines = list(features)
+        if traits:
+            all_feature_trait_lines.extend([''] + list(traits))
+
         progression_notes = self._progression_notes()
         if progression_notes:
-            trait_lines.extend([''] + progression_notes)
+            all_feature_trait_lines.extend([''] + progression_notes)
+
         spellcaster_notes = self._spellcaster_notes(prof_bonus, spellbook=spellbook)
         if spellcaster_notes:
-            trait_lines.extend([''] + spellcaster_notes)
-        fields['Feat+Traits'] = '\n'.join(trait_lines)
+            all_feature_trait_lines.extend([''] + spellcaster_notes)
+
+        page_one_lines, page_two_lines = self._split_feature_trait_lines(all_feature_trait_lines)
+        fields['Features and Traits'] = '\n'.join(page_one_lines)
+        fields['Feat+Traits'] = '\n'.join(page_two_lines)
 
         # Weapon attacks (populate first weapon slot from equipment if applicable)
         weapon_equipped = False
@@ -1429,6 +1497,9 @@ class Character:
             font_name = self.rng.choice(list(AVAILABLE_FONTS.keys()))
         apply_custom_font(output_pdf_filename, font_name,
                           expertise_skills=self.expertise_skills)
+
+        if self.char_class not in SPELLCASTING_ABILITY:
+            remove_spell_sheet_page(output_pdf_filename)
 
         print(f"Character sheet saved to: {output_pdf_filename}")
         return
@@ -1590,6 +1661,23 @@ def apply_spellbook_fields(fields, spellbook):
 
         for field_name, spell in zip(available_fields, spells):
             fields[field_name] = spell['name']
+
+
+def remove_spell_sheet_page(pdf_path):
+    """Remove page 3 spell sheet for non-spellcaster output files."""
+    temp_path = f"{pdf_path}.tmp"
+    wrote_temp = False
+    doc = fitz.open(pdf_path)
+    try:
+        if len(doc) >= 3:
+            doc.delete_page(2)
+            doc.save(temp_path)
+            wrote_temp = True
+    finally:
+        doc.close()
+
+    if wrote_temp:
+        os.replace(temp_path, pdf_path)
 
 
 def apply_custom_font(pdf_path, font_name, expertise_skills=None):

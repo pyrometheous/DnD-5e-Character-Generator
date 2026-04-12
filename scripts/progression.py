@@ -115,6 +115,10 @@ def _ensure_progression_fields(character_obj):
         character_obj.class_feature_choices = []
     if not hasattr(character_obj, 'progression_choices'):
         character_obj.progression_choices = []
+    if not hasattr(character_obj, 'class_specific_by_level'):
+        character_obj.class_specific_by_level = {}
+    if not hasattr(character_obj, 'class_specific_current'):
+        character_obj.class_specific_current = {}
     if not hasattr(character_obj, 'progression_built_to_level'):
         character_obj.progression_built_to_level = 0
     if not hasattr(character_obj, 'subclass'):
@@ -133,6 +137,8 @@ def _ensure_progression_fields(character_obj):
 def _process_level(character_obj, current_level: int, config: dict, spellbook_config: dict, rng):
     level_data = getattr(Levels, f'{character_obj.char_class}_{current_level}')
 
+    _record_class_specific_variables(character_obj, current_level, level_data)
+
     for feature in getattr(level_data, 'features', []):
         feature_index = feature.get('index', '')
         if feature['name'] == 'Ability Score Improvement':
@@ -148,6 +154,22 @@ def _process_level(character_obj, current_level: int, config: dict, spellbook_co
     _resolve_class_specific_growth(character_obj, current_level, config, rng)
     _apply_subclass_level_features(character_obj, current_level, config, rng)
     _process_spellcasting_level(character_obj, current_level, spellbook_config, config, rng)
+
+
+def _record_class_specific_variables(character_obj, current_level: int, level_data):
+    class_specific = dict(getattr(level_data, 'class_specific', None) or {})
+    character_obj.class_specific_by_level[current_level] = class_specific
+
+    for key, value in class_specific.items():
+        previous = character_obj.class_specific_current.get(key)
+        character_obj.class_specific_current[key] = value
+        if previous != value:
+            character_obj.progression_choices.append({
+                'type': 'class_specific',
+                'level': current_level,
+                'key': key,
+                'value': value,
+            })
 
 
 def _resolve_class_specific_growth(character_obj, current_level: int, config: dict, rng):
